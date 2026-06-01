@@ -1,0 +1,15 @@
+Class_ID,Class_Name,Spectra_Count,Percentage (%)
+-1,Unlabeled/Transparent,51455,4.25
+0,Necrosis,10795,0.89
+2,Tumor,579601,47.92
+3,Skeletal muscle cells,11143,0.92
+4,Stroma with inflammation,149319,12.34
+5,Connective tissue,68619,5.67
+6,Tumor stroma,237302,19.62
+8,Glandular tissue,4203,0.35
+9,Dysplasia,4628,0.38
+10,Blood vessel,3412,0.28
+15,Artifact,18357,1.52
+19,"Epithelium (squamous, normal)",15189,1.26
+20,Tumor with necrosis,54911,4.54
+23,Lymphatic tissue,666,0.06

@@ -1,0 +1,20 @@
+# Datasets
+*.parquet
+
+# Reference books
+*.pdf
+
+# Generated outputs
+parameters/
+metric_images/
+*.png
+*.h5
+*.keras
+
+# CSV outputs (keep summary)
+*.csv
+!dataset_statistics_summary.csv
+
+# Python cache
+__pycache__/
+*.pyc
