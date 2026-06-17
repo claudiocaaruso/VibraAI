@@ -1,23 +1,45 @@
-# Datasets
+# ── Data ──────────────────────────────────────────────
+# Raw/processed spectra live in datasets/ (spectral, Vt, X_pca parquet)
+datasets/
 *.parquet
 
-# Reference books
-*.pdf
-
-# Generated outputs
+# ── Generated outputs ─────────────────────────────────
+# Training/CV artifacts: results/, saved params, plots, reports
+results/
 parameters/
 metric_images/
 *.png
 *.h5
 *.keras
+*.tflite
+*.onnx
+*.joblib
+*.pkl
+classification_report.txt
 
-# CSV outputs (keep summary)
+# CSV outputs (keep the committed dataset summary)
 *.csv
 !dataset_statistics_summary.csv
 
-# Python cache
-__pycache__/
-*.pyc
+# ── Docs ──────────────────────────────────────────────
+# Keep docs/*.md, ignore reference PDFs
+*.pdf
 
-# macOS metadata
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# ── Editor / OS ───────────────────────────────────────
+.vscode/
+.spyproject/
 .DS_Store
