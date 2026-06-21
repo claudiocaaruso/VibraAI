@@ -18,7 +18,7 @@ from sklearn.metrics import auc as auc_score
 from sklearn.metrics import confusion_matrix, roc_curve
 
 CLASS_NAMES = ['Healthy', 'Tumoral']
-
+Y_PROB_BIAS = 0.47
 
 def _finish(fig, save_path, show):
     fig.tight_layout()
@@ -98,7 +98,7 @@ def plot_confusion(roc_data, title='', save_path=None, show=False):
     """Row-normalised confusion matrix, aggregated (summed) across folds."""
     total = np.zeros((2, 2), dtype=float)
     for y_true, y_prob in roc_data:
-        total += confusion_matrix(y_true, (y_prob > 0.45).astype(int), labels=[0, 1])
+        total += confusion_matrix(y_true, (y_prob > Y_PROB_BIAS).astype(int), labels=[0, 1])
     cm = total / total.sum(axis=1, keepdims=True)
 
     fig, ax = plt.subplots(figsize=(6, 5))

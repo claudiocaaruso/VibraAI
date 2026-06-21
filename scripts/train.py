@@ -38,14 +38,14 @@ MODE = 'single'                 # 'single' or 'grid'
 
 # --- dataset & labels (fully configurable) ---
 TUMOR_LABELS   = [2,20]     # mapped to the positive class (1 = Tumoral)
-EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10]       # dropped from the dataset before training
+EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
 SUBSAMPLE      = None        # cap on TOTAL rows kept (random, leakage-free); None = all
 
 # --- single-mode configuration ---
-ARCHITECTURE = 'L'              # 'S' | 'M' | 'L'
-N_PC         = 483             # number of PCA components
+ARCHITECTURE = 'S'              # 'S' | 'M' | 'L'
+N_PC         = 40             # number of PCA components
 SNV          = True             # SNV normalisation on/off
-CV           = 5             # None (single split) | 5 | 10
+CV           = 3            # None (single split) | 5 | 10
 
 # --- grid-mode variants (only these two sweep; SNV and CV stay fixed above) ---
 ARCHITECTURE_VARIANTS = ['S', 'M', 'L']

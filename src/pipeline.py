@@ -16,6 +16,7 @@ from sklearn.model_selection import (GroupShuffleSplit, StratifiedGroupKFold,
 
 from src.model import ann_classification
 
+Y_PROB_BIAS = 0.47
 
 # ── preprocessing ─────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ def evaluate_fold(model, X_te, y_te):
     Precision / recall / F1 are reported for the positive (Tumoral) class.
     """
     y_prob = model.predict(X_te, verbose=0).flatten()
-    y_pred = (y_prob > 0.45).astype(int)
+    y_pred = (y_prob > Y_PROB_BIAS).astype(int)
     try:
         auc = roc_auc_score(y_te, y_prob)
     except ValueError:           # single class present in this test split
