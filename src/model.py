@@ -23,16 +23,16 @@ def ann_classification(num_components, size):
         # model.add(Dropout(rate=0.4))
     elif size == 'M':
         model.add(Dense(64, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
         model.add(Dense(32, activation='relu'))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
     elif size == 'L':
         model.add(Dense(128, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
         model.add(Dense(64,  activation='relu'))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
         model.add(Dense(16,  activation='relu'))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
     else:
         raise ValueError("size must be 'S', 'M', or 'L'")
 

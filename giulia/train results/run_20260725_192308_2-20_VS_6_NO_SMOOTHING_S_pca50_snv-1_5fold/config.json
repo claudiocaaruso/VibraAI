@@ -1,0 +1,72 @@
+{
+  "DATA_PATH": "/Users/giuliatarsi/Desktop/VIBRA/PCA/spectral_dataset_clean.parquet",
+  "OUTPUT_BASE_DIR": "/Users/giuliatarsi/Desktop/VIBRA/train_results",
+  "MODE": "single",
+  "MODE_DESCRIPTION": "single: complete run with tables, plots, maps and models; grid: comparison table, optionally with training history plots",
+  "EXPERIMENT_NAME": "2-20_VS_6__NO_SMOOTHING",
+  "CLASS_0_NAME": "class_0",
+  "CLASS_1_NAME": "class_1",
+  "CLASS_0_LABELS": [
+    6
+  ],
+  "CLASS_1_LABELS": [
+    2,
+    20
+  ],
+  "CLASS_0_LABELS_CONFIG": [
+    6
+  ],
+  "CLASS_1_LABELS_CONFIG": [
+    2,
+    20
+  ],
+  "USE_SNV": true,
+  "NORMALIZATION": "SNV per spectrum",
+  "FEATURE_MODE": "center_spectrum_only",
+  "MAP_GROUP_COLUMNS": [
+    "Sample_ID",
+    "Map_ID"
+  ],
+  "BALANCE_CLASSES": true,
+  "BALANCING_SCOPE": "training_only",
+  "VALIDATION_AND_TEST_BALANCED": false,
+  "filtered_class_counts": {
+    "0": 216117,
+    "1": 579582
+  },
+  "N_FOLDS": 5,
+  "GROUP_COLUMN": "Sample_ID",
+  "VALIDATION_SIZE_WITHIN_TRAIN": 0.1875,
+  "N_COMPONENTS": 50,
+  "MODEL_SIZE": "S",
+  "EPOCHS": 100,
+  "BATCH_SIZE": 8192,
+  "CLASSIFICATION_THRESHOLD": 0.49,
+  "MODEL_SIZE_VARIANTS": [
+    "S",
+    "M",
+    "L"
+  ],
+  "N_COMPONENTS_VARIANTS": [
+    50
+  ],
+  "BATCH_SIZE_VARIANTS": [
+    8192
+  ],
+  "CLASSIFICATION_THRESHOLD_VARIANTS": [
+    0.49
+  ],
+  "SAVE_GRID_HISTORY_PLOTS": true,
+  "SHOW_GRID_HISTORY_PLOTS": false,
+  "SMOOTH_PREDICTION_PROBS": false,
+  "SMOOTHING_SCOPE": "post_processing_only_after_prediction",
+  "PREDICTION_SMOOTHING_METHOD": "mean",
+  "PREDICTION_SMOOTHING_KERNEL_SIZE": 5,
+  "RANDOM_STATE": 43,
+  "PCA_RANDOM_STATE": 42,
+  "SAVE_PCA_ARTIFACTS": false,
+  "SAVE_PREDICTION_MAPS": true,
+  "SAMPLE_RANKING_PRIMARY_METRIC": "class_1_f1",
+  "SAMPLE_RANKING_SECONDARY_METRIC": "class_1_recall",
+  "SHOW_PLOTS": true
+}

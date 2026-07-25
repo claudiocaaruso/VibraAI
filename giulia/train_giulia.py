@@ -59,9 +59,9 @@ OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results")
 
 #   "single" -> one complete run with detailed outputs, maps and models
 #   "grid"   -> many lightweight runs, only comparison tables
-MODE = "grid"
+MODE = "single"
 
-EXPERIMENT_NAME = "2-20_VS_all_other(S,M,Lcomparison)"
+EXPERIMENT_NAME = "2-20_VS_all_other__SMOOTHING"
 
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
@@ -100,7 +100,7 @@ PREDICTION_SMOOTHING_KERNEL_SIZE = 5
 RANDOM_STATE = 43
 
 SAVE_PCA_ARTIFACTS = False
-SAVE_PREDICTION_MAPS = False
+SAVE_PREDICTION_MAPS = True
 
 SAMPLE_RANKING_PRIMARY_METRIC = "class_1_f1"
 SAMPLE_RANKING_SECONDARY_METRIC = "class_1_recall"

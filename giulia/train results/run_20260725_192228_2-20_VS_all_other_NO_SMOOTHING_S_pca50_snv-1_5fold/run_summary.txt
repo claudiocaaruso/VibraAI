@@ -1,0 +1,135 @@
+Fold-wise SNV + PCA + ANN Binary Classification
+======================================================================
+
+Run timestamp: 2026-07-25T19:25:54
+Run directory: /Users/giuliatarsi/Desktop/VIBRA/train_results/run_20260725_192228_2-20_VS_all_other_NO_SMOOTHING_S_pca50_snv-1_5fold
+
+Configuration
+----------------------------------------------------------------------
+DATA_PATH: /Users/giuliatarsi/Desktop/VIBRA/PCA/spectral_dataset_clean.parquet
+OUTPUT_BASE_DIR: /Users/giuliatarsi/Desktop/VIBRA/train_results
+MODE: single
+MODE_DESCRIPTION: single: complete run with tables, plots, maps and models; grid: comparison table, optionally with training history plots
+EXPERIMENT_NAME: 2-20_VS_all_other__NO_SMOOTHING
+CLASS_0_NAME: class_0
+CLASS_1_NAME: class_1
+CLASS_0_LABELS: [np.int16(0), np.int16(3), np.int16(4), np.int16(5), np.int16(6), np.int16(8), np.int16(10), np.int16(19), np.int16(23)]
+CLASS_1_LABELS: [2, 20]
+CLASS_0_LABELS_CONFIG: all_other
+CLASS_1_LABELS_CONFIG: [2, 20]
+USE_SNV: True
+NORMALIZATION: SNV per spectrum
+FEATURE_MODE: center_spectrum_only
+MAP_GROUP_COLUMNS: ['Sample_ID', 'Map_ID']
+BALANCE_CLASSES: True
+BALANCING_SCOPE: training_only
+VALIDATION_AND_TEST_BALANCED: False
+filtered_class_counts: {0: 479463, 1: 579582}
+N_FOLDS: 5
+GROUP_COLUMN: Sample_ID
+VALIDATION_SIZE_WITHIN_TRAIN: 0.1875
+N_COMPONENTS: 50
+MODEL_SIZE: S
+EPOCHS: 100
+BATCH_SIZE: 8192
+CLASSIFICATION_THRESHOLD: 0.49
+MODEL_SIZE_VARIANTS: ['S', 'M', 'L']
+N_COMPONENTS_VARIANTS: [50]
+BATCH_SIZE_VARIANTS: [8192]
+CLASSIFICATION_THRESHOLD_VARIANTS: [0.49]
+SAVE_GRID_HISTORY_PLOTS: True
+SHOW_GRID_HISTORY_PLOTS: False
+SMOOTH_PREDICTION_PROBS: False
+SMOOTHING_SCOPE: post_processing_only_after_prediction
+PREDICTION_SMOOTHING_METHOD: mean
+PREDICTION_SMOOTHING_KERNEL_SIZE: 5
+RANDOM_STATE: 43
+PCA_RANDOM_STATE: 42
+SAVE_PCA_ARTIFACTS: False
+SAVE_PREDICTION_MAPS: True
+SAMPLE_RANKING_PRIMARY_METRIC: class_1_f1
+SAMPLE_RANKING_SECONDARY_METRIC: class_1_recall
+SHOW_PLOTS: True
+
+Dataset
+----------------------------------------------------------------------
+Raw dataset shape: (1059045, 488)
+Filtered dataset shape: (1059045, 489)
+Spectral bands: 483
+Unique groups: 25
+Filtered class counts: {0: 479463, 1: 579582}
+Feature mode: center spectrum only
+Balancing scope: training partition only, separately in each fold
+Validation and test rows: complete and not balanced
+
+Mean Test Metrics Across Folds
+----------------------------------------------------------------------
+epochs_ran: 29.200000 +/- 15.786070
+train_rows_before_balancing: 663122.000000 +/- 35587.112745
+train_rows: 628062.800000 +/- 53142.619687
+validation_rows: 184114.000000 +/- 13295.610065
+test_rows: 211809.000000 +/- 23987.750134
+train_groups: 16.000000 +/- 0.000000
+validation_groups: 4.000000 +/- 0.000000
+test_groups: 5.000000 +/- 0.000000
+train_class_1_rate: 0.500000 +/- 0.000000
+validation_class_1_rate: 0.622198 +/- 0.036468
+test_class_1_rate: 0.552906 +/- 0.078426
+train_class_0_before_balancing: 314031.400000 +/- 26571.309844
+train_class_1_before_balancing: 349090.600000 +/- 14531.859492
+train_class_0_after_balancing: 314031.400000 +/- 26571.309844
+train_class_1_after_balancing: 314031.400000 +/- 26571.309844
+prediction_smoothing_kernel_size: 0.000000 +/- 0.000000
+test_loss: 0.575588 +/- 0.137762
+keras_test_accuracy_at_0_5: 0.722390 +/- 0.080189
+keras_test_sensitivity_at_0_5: 0.713959 +/- 0.103279
+keras_test_auc_raw: 0.784534 +/- 0.094648
+train_accuracy: 0.763299 +/- 0.028926
+train_sensitivity: 0.747118 +/- 0.021266
+train_auc: 0.841291 +/- 0.032496
+train_auc_sklearn: 0.841291 +/- 0.032496
+train_class_0_precision: 0.754768 +/- 0.022652
+train_class_0_recall: 0.779481 +/- 0.043945
+train_class_0_f1: 0.766721 +/- 0.031384
+train_class_1_precision: 0.773084 +/- 0.038458
+train_class_1_recall: 0.747118 +/- 0.021266
+train_class_1_f1: 0.759643 +/- 0.026625
+train_confusion_tn: 244758.200000 +/- 24729.589174
+train_confusion_fp: 69273.200000 +/- 14956.856628
+train_confusion_fn: 79716.800000 +/- 12397.163292
+train_confusion_tp: 234314.600000 +/- 16021.534050
+test_accuracy: 0.723376 +/- 0.079352
+test_sensitivity: 0.723645 +/- 0.103450
+test_auc: 0.784534 +/- 0.094656
+test_auc_sklearn: 0.784534 +/- 0.094656
+class_0_precision: 0.677077 +/- 0.107900
+class_0_recall: 0.710088 +/- 0.085734
+class_0_f1: 0.692297 +/- 0.094876
+class_1_precision: 0.756782 +/- 0.063064
+class_1_recall: 0.723645 +/- 0.103450
+class_1_f1: 0.739041 +/- 0.083077
+confusion_tn: 69204.600000 +/- 23186.760507
+confusion_fp: 26688.000000 +/- 6898.224518
+confusion_fn: 32261.600000 +/- 13816.016242
+confusion_tp: 83654.800000 +/- 12173.370597
+
+Total Confusion Matrix Across Folds
+----------------------------------------------------------------------
+[[346023 133440]
+ [161308 418274]]
+
+Normalized Total Confusion Matrix Across Folds
+----------------------------------------------------------------------
+[[0.72168864 0.27831136]
+ [0.27831782 0.72168218]]
+
+Output Tables
+----------------------------------------------------------------------
+tables/fold_results.csv
+tables/sample_results.csv
+tables/sample_difficulty_ranking.csv
+tables/fold_label_distribution.csv
+tables/history_all_folds.csv
+tables/history_mean.csv
+tables/history_std.csv
+tables/comparative_results.csv
