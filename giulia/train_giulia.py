@@ -61,6 +61,8 @@ OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results")
 #   "grid"   -> many lightweight runs, only comparison tables
 MODE = "single"
 
+EXPERIMENT_NAME = "2_vs_6__modelS"
+
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
 CLASS_1_LABELS = [2]
@@ -75,33 +77,42 @@ N_FOLDS = 5
 GROUP_COLUMN = "Sample_ID"
 VALIDATION_SIZE_WITHIN_TRAIN = 0.1875
 
-N_COMPONENTS = 75
+N_COMPONENTS = 50
 PCA_RANDOM_STATE = 42
 
 MODEL_SIZE = "S"
-EPOCHS = 200
-BATCH_SIZE = 4096
+EPOCHS = 50
+BATCH_SIZE = 8192
 CLASSIFICATION_THRESHOLD = 0.5
 
 # Grid mode variants. These are ignored when MODE = "single".
-MODEL_SIZE_VARIANTS = ["S", "M"]
-N_COMPONENTS_VARIANTS = [10, 20, 50, 75]
-BATCH_SIZE_VARIANTS = [512, 4096]
+MODEL_SIZE_VARIANTS = ["S"]
+N_COMPONENTS_VARIANTS = [30, 50, 75, 100, 200, 300]
+BATCH_SIZE_VARIANTS = [512, 1024, 2048, 4096, 8192]
 CLASSIFICATION_THRESHOLD_VARIANTS = [0.5]
+SAVE_GRID_HISTORY_PLOTS = True
+SHOW_GRID_HISTORY_PLOTS = False
 
 SMOOTH_PREDICTION_PROBS = True
 PREDICTION_SMOOTHING_METHOD = "mean"
-PREDICTION_SMOOTHING_KERNEL_SIZE = 3
+PREDICTION_SMOOTHING_KERNEL_SIZE = 5
 
-RANDOM_STATE = 44
+RANDOM_STATE = 43
 
 SAVE_PCA_ARTIFACTS = False
-SAVE_PREDICTION_MAPS = True
+SAVE_PREDICTION_MAPS = False
 
 SAMPLE_RANKING_PRIMARY_METRIC = "class_1_f1"
 SAMPLE_RANKING_SECONDARY_METRIC = "class_1_recall"
 
 SHOW_PLOTS = True
+
+
+def sanitize_experiment_name(experiment_name):
+    """Return a filesystem-friendly experiment name for output folders."""
+    cleaned = "".join(char if char.isalnum() or char in ["-", "_"] else "_" for char in experiment_name.strip())
+    cleaned = "_".join(part for part in cleaned.split("_") if part)
+    return cleaned
 
 
 def build_config(class_0_labels, class_1_labels, filtered_class_counts):
@@ -111,8 +122,9 @@ def build_config(class_0_labels, class_1_labels, filtered_class_counts):
         "MODE": MODE,
         "MODE_DESCRIPTION": (
             "single: complete run with tables, plots, maps and models; "
-            "grid: lightweight comparison table only"
+            "grid: comparison table, optionally with training history plots"
         ),
+        "EXPERIMENT_NAME": EXPERIMENT_NAME,
         "CLASS_0_NAME": CLASS_0_NAME,
         "CLASS_1_NAME": CLASS_1_NAME,
         "CLASS_0_LABELS": class_0_labels,
@@ -139,6 +151,8 @@ def build_config(class_0_labels, class_1_labels, filtered_class_counts):
         "N_COMPONENTS_VARIANTS": N_COMPONENTS_VARIANTS,
         "BATCH_SIZE_VARIANTS": BATCH_SIZE_VARIANTS,
         "CLASSIFICATION_THRESHOLD_VARIANTS": CLASSIFICATION_THRESHOLD_VARIANTS,
+        "SAVE_GRID_HISTORY_PLOTS": SAVE_GRID_HISTORY_PLOTS,
+        "SHOW_GRID_HISTORY_PLOTS": SHOW_GRID_HISTORY_PLOTS,
         "SMOOTH_PREDICTION_PROBS": SMOOTH_PREDICTION_PROBS,
         "SMOOTHING_SCOPE": "post_processing_only_after_prediction",
         "PREDICTION_SMOOTHING_METHOD": PREDICTION_SMOOTHING_METHOD,
@@ -158,9 +172,18 @@ def run_grid():
     set_seed(RANDOM_STATE)
 
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_save_dir = os.path.join(OUTPUT_BASE_DIR, f"grid_{run_timestamp}")
+    experiment_name = sanitize_experiment_name(EXPERIMENT_NAME)
+    run_name = f"grid_{run_timestamp}"
+    if experiment_name:
+        run_name = f"{run_name}_{experiment_name}"
+    base_save_dir = os.path.join(OUTPUT_BASE_DIR, run_name)
     tables_dir = os.path.join(base_save_dir, "tables")
+    grid_history_dir = os.path.join(base_save_dir, "grid_history")
+    grid_metrics_dir = os.path.join(base_save_dir, "grid_metric_images")
     os.makedirs(tables_dir, exist_ok=True)
+    if SAVE_GRID_HISTORY_PLOTS:
+        os.makedirs(grid_history_dir, exist_ok=True)
+        os.makedirs(grid_metrics_dir, exist_ok=True)
 
     print("Loading raw spectral dataset...")
     df_raw = pd.read_parquet(DATA_PATH)
@@ -181,6 +204,7 @@ def run_grid():
     print(f"Filtered dataset shape: {df_filtered.shape}")
     print(f"Class counts: {filtered_class_counts}")
     print(f"Results table directory: {tables_dir}")
+    print(f"Save grid history plots: {SAVE_GRID_HISTORY_PLOTS}")
 
     y_all = df_filtered["Binary_Label"].to_numpy(dtype=int)
     groups_all = df_filtered[GROUP_COLUMN].to_numpy()
@@ -200,6 +224,14 @@ def run_grid():
         print("=" * 70)
 
         config_fold_rows = []
+        history_frames = []
+        config_id = f"config_{config_number:03d}_{model_size}_pca{n_components}_batch{batch_size}_thr{str(threshold).replace('.', 'p')}"
+        if SAVE_GRID_HISTORY_PLOTS:
+            config_history_dir = os.path.join(grid_history_dir, config_id)
+            config_metrics_dir = os.path.join(grid_metrics_dir, config_id)
+            os.makedirs(config_history_dir, exist_ok=True)
+            os.makedirs(config_metrics_dir, exist_ok=True)
+
         for fold_number, (train_idx_unbalanced, val_idx, test_idx) in enumerate(folds, start=1):
             fold_seed = RANDOM_STATE + fold_number
             set_seed(fold_seed)
@@ -233,6 +265,27 @@ def run_grid():
                 verbose=0,
             )
 
+            if SAVE_GRID_HISTORY_PLOTS:
+                history_frame = history_to_frame(history, fold_number)
+                history_output_frame = history_frame.copy()
+                history_output_frame.insert(1, "config_id", config_id)
+                history_output_frame.insert(2, "model_size", model_size)
+                history_output_frame.insert(3, "n_components", n_components)
+                history_output_frame.insert(4, "batch_size", batch_size)
+                history_output_frame.insert(5, "classification_threshold", threshold)
+                history_output_frame.to_csv(
+                    os.path.join(config_history_dir, f"history_fold_{fold_number}.csv"),
+                    index=False,
+                )
+                history_frames.append(history_frame)
+                plot_history(
+                    history_frame,
+                    config_metrics_dir,
+                    f"METRICS_FOLD_{fold_number}.png",
+                    f"{config_id} - Fold {fold_number}",
+                    SHOW_GRID_HISTORY_PLOTS,
+                )
+
             y_raw_probs = model.predict(X_test, verbose=0).reshape(-1)
             prediction_metrics, _, _, _ = evaluate_predictions(
                 df_test,
@@ -247,6 +300,7 @@ def run_grid():
             )
 
             row = {
+                "config_id": config_id,
                 "model_size": model_size,
                 "n_components": n_components,
                 "batch_size": batch_size,
@@ -272,10 +326,18 @@ def run_grid():
             del model, X_train, X_val, X_test
             gc.collect()
 
+        if SAVE_GRID_HISTORY_PLOTS and history_frames:
+            history_all, history_mean, history_std = summarize_histories(history_frames)
+            history_all.to_csv(os.path.join(config_history_dir, "history_all_folds.csv"), index=False)
+            history_mean.to_csv(os.path.join(config_history_dir, "history_mean.csv"), index=False)
+            history_std.to_csv(os.path.join(config_history_dir, "history_std.csv"), index=False)
+            plot_mean_history(history_mean, history_std, config_metrics_dir, SHOW_GRID_HISTORY_PLOTS)
+
         config_df = pd.DataFrame(config_fold_rows)
         _, means, stds = summarize_fold_metrics(config_df, exclude_cols=["fold"])
         summary_rows.append(
             {
+                "config_id": config_id,
                 "model_size": model_size,
                 "n_components": n_components,
                 "batch_size": batch_size,
@@ -319,7 +381,11 @@ def main():
     set_seed(RANDOM_STATE)
 
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"run_{run_timestamp}_{MODEL_SIZE}_pca{N_COMPONENTS}_snv-{int(USE_SNV)}_{N_FOLDS}fold"
+    experiment_name = sanitize_experiment_name(EXPERIMENT_NAME)
+    run_name = f"run_{run_timestamp}"
+    if experiment_name:
+        run_name = f"{run_name}_{experiment_name}"
+    run_name = f"{run_name}_{MODEL_SIZE}_pca{N_COMPONENTS}_snv-{int(USE_SNV)}_{N_FOLDS}fold"
     base_save_dir = os.path.join(OUTPUT_BASE_DIR, run_name)
     dirs = create_run_dirs(base_save_dir)
 
