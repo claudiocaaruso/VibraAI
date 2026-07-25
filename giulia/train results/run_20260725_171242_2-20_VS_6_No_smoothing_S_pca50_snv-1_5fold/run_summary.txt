@@ -1,0 +1,121 @@
+Fold-wise SNV + PCA + ANN Binary Classification
+======================================================================
+
+Run timestamp: 2026-07-25T17:14:42
+Run directory: /Users/giuliatarsi/Desktop/VIBRA/train_results/run_20260725_171242_2-20_VS_all_other_No_smoothing_S_pca50_snv-1_5fold
+
+Configuration
+----------------------------------------------------------------------
+DATA_PATH: /Users/giuliatarsi/Desktop/VIBRA/PCA/spectral_dataset_clean.parquet
+OUTPUT_BASE_DIR: /Users/giuliatarsi/Desktop/VIBRA/train_results
+MODE: single
+MODE_DESCRIPTION: single: complete run with tables, plots, maps and models; grid: comparison table, optionally with training history plots
+EXPERIMENT_NAME: 2-20_VS_all_other(No_smoothing)
+CLASS_0_NAME: class_0
+CLASS_1_NAME: class_1
+CLASS_0_LABELS: [6]
+CLASS_1_LABELS: [2, 20]
+CLASS_0_LABELS_CONFIG: [6]
+CLASS_1_LABELS_CONFIG: [2, 20]
+USE_SNV: True
+NORMALIZATION: SNV per spectrum
+FEATURE_MODE: center_spectrum_only
+MAP_GROUP_COLUMNS: ['Sample_ID', 'Map_ID']
+BALANCE_CLASSES: True
+BALANCING_SCOPE: training_only
+VALIDATION_AND_TEST_BALANCED: False
+filtered_class_counts: {0: 216117, 1: 579582}
+N_FOLDS: 5
+GROUP_COLUMN: Sample_ID
+VALIDATION_SIZE_WITHIN_TRAIN: 0.1875
+N_COMPONENTS: 50
+MODEL_SIZE: S
+EPOCHS: 100
+BATCH_SIZE: 8192
+CLASSIFICATION_THRESHOLD: 0.49
+MODEL_SIZE_VARIANTS: ['S']
+N_COMPONENTS_VARIANTS: [30, 50, 75, 100, 200, 300]
+BATCH_SIZE_VARIANTS: [512, 1024, 2048, 4096, 8192]
+CLASSIFICATION_THRESHOLD_VARIANTS: [0.49]
+SAVE_GRID_HISTORY_PLOTS: True
+SHOW_GRID_HISTORY_PLOTS: False
+SMOOTH_PREDICTION_PROBS: False
+SMOOTHING_SCOPE: post_processing_only_after_prediction
+PREDICTION_SMOOTHING_METHOD: mean
+PREDICTION_SMOOTHING_KERNEL_SIZE: 5
+RANDOM_STATE: 43
+PCA_RANDOM_STATE: 42
+SAVE_PCA_ARTIFACTS: False
+SAVE_PREDICTION_MAPS: True
+SAMPLE_RANKING_PRIMARY_METRIC: class_1_f1
+SAMPLE_RANKING_SECONDARY_METRIC: class_1_recall
+SHOW_PLOTS: True
+
+Dataset
+----------------------------------------------------------------------
+Raw dataset shape: (1059045, 488)
+Filtered dataset shape: (795699, 489)
+Spectral bands: 483
+Unique groups: 25
+Filtered class counts: {0: 216117, 1: 579582}
+Feature mode: center spectrum only
+Balancing scope: training partition only, separately in each fold
+Validation and test rows: complete and not balanced
+
+Mean Test Metrics Across Folds
+----------------------------------------------------------------------
+epochs_ran: 72.800000 +/- 32.568390
+train_rows_before_balancing: 473928.000000 +/- 58077.244322
+train_rows: 239182.000000 +/- 43077.351102
+validation_rows: 162631.200000 +/- 39990.512134
+test_rows: 159139.800000 +/- 56649.643244
+train_groups: 16.000000 +/- 1.414214
+validation_groups: 4.000000 +/- 0.000000
+test_groups: 5.000000 +/- 1.414214
+train_class_1_rate: 0.500000 +/- 0.000000
+validation_class_1_rate: 0.661766 +/- 0.067475
+test_class_1_rate: 0.732041 +/- 0.038554
+train_class_0_before_balancing: 119591.000000 +/- 21538.675551
+train_class_1_before_balancing: 354337.000000 +/- 41111.904195
+train_class_0_after_balancing: 119591.000000 +/- 21538.675551
+train_class_1_after_balancing: 119591.000000 +/- 21538.675551
+prediction_smoothing_kernel_size: 0.000000 +/- 0.000000
+test_loss: 0.499693 +/- 0.066052
+keras_test_accuracy_at_0_5: 0.756993 +/- 0.042581
+keras_test_sensitivity_at_0_5: 0.760226 +/- 0.077950
+keras_test_auc_raw: 0.831366 +/- 0.032008
+test_accuracy: 0.760349 +/- 0.042511
+test_sensitivity: 0.769642 +/- 0.078445
+test_auc: 0.831373 +/- 0.032003
+test_auc_sklearn: 0.831373 +/- 0.032003
+class_0_precision: 0.544002 +/- 0.070904
+class_0_recall: 0.730939 +/- 0.110758
+class_0_f1: 0.617168 +/- 0.058075
+class_1_precision: 0.888493 +/- 0.034226
+class_1_recall: 0.769642 +/- 0.078445
+class_1_f1: 0.822543 +/- 0.044181
+confusion_tn: 31067.600000 +/- 14014.566504
+confusion_fp: 12155.800000 +/- 7349.555408
+confusion_fn: 27213.400000 +/- 16535.246484
+confusion_tp: 88703.000000 +/- 29565.027524
+
+Total Confusion Matrix Across Folds
+----------------------------------------------------------------------
+[[155338  60779]
+ [136067 443515]]
+
+Normalized Total Confusion Matrix Across Folds
+----------------------------------------------------------------------
+[[0.71876807 0.28123193]
+ [0.23476747 0.76523253]]
+
+Output Tables
+----------------------------------------------------------------------
+tables/fold_results.csv
+tables/sample_results.csv
+tables/sample_difficulty_ranking.csv
+tables/fold_label_distribution.csv
+tables/history_all_folds.csv
+tables/history_mean.csv
+tables/history_std.csv
+tables/comparative_results.csv

@@ -1,9 +1,62 @@
 import os
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+
+plt.rcParams.update(
+    {
+        "figure.figsize": (9, 5),
+        "figure.dpi": 120,
+        "savefig.dpi": 300,
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman", "CMU Serif", "Times New Roman", "DejaVu Serif"],
+        "mathtext.fontset": "cm",
+        "font.size": 13,
+        "axes.titlesize": 14,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12,
+        "legend.title_fontsize": 12,
+        "axes.linewidth": 0.8,
+        "grid.color": "0.85",
+        "grid.linestyle": "-",
+        "grid.linewidth": 0.6,
+        "lines.linewidth": 1.4,
+    }
+)
+
+CLASS_0_COLOR = "#FCFDBF"
+CLASS_1_COLOR = "#140E36"
+DISCARDED_COLOR = "#ffffff"
+CLASS_CMAP = ListedColormap([CLASS_1_COLOR, CLASS_0_COLOR])
+CLASS_NORM = BoundaryNorm([-0.5, 0.5, 1.5], CLASS_CMAP.N)
+ERROR_CMAP = ListedColormap(["#ffffff", "#B00000"])
+ERROR_NORM = BoundaryNorm([-0.5, 0.5, 1.5], ERROR_CMAP.N)
+PROBABILITY_CMAP = "magma_r"
+CONFUSION_CMAP = LinearSegmentedColormap.from_list(
+    "confusion_blues",
+    ["#ffffff", "#c6dbef", "#6baed6", "#08519c", "#08306b"],
+)
+
+
+def apply_axis_style(ax, show_grid=True):
+    if show_grid:
+        ax.grid(True, alpha=0.35)
+    ax.tick_params(axis="both", which="major", labelsize=13)
+
+
+def color_class_tick_labels(ax):
+    xlabels = ax.get_xticklabels()
+    ylabels = ax.get_yticklabels()
+    for labels in [xlabels, ylabels]:
+        if len(labels) >= 2:
+            labels[0].set_color(CLASS_0_COLOR)
+            labels[1].set_color(CLASS_1_COLOR)
 
 
 def plot_history(history_frame, metrics_dir, filename, title_prefix, show_plots):
@@ -22,7 +75,7 @@ def plot_history(history_frame, metrics_dir, filename, title_prefix, show_plots)
         ax.set_title(f"{title_prefix} - {title}")
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
-        ax.grid(True, alpha=0.35)
+        apply_axis_style(ax)
         ax.legend()
 
     plt.tight_layout()
@@ -56,7 +109,7 @@ def plot_mean_history(mean_history, std_history, metrics_dir, show_plots):
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
-        ax.grid(True, alpha=0.35)
+        apply_axis_style(ax)
         ax.legend()
 
     plt.tight_layout()
@@ -68,32 +121,56 @@ def plot_mean_history(mean_history, std_history, metrics_dir, show_plots):
 
 
 def plot_confusion_matrices(cm_total, class_names, metrics_dir, show_plots):
-    plt.figure(figsize=(7, 6))
-    sns.heatmap(cm_total, annot=True, fmt="d", cmap="Blues", xticklabels=class_names, yticklabels=class_names)
-    plt.title("Total Confusion Matrix Across Folds")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    display_class_names = [name.replace("_", " ").title() for name in class_names]
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(
+        cm_total,
+        annot=True,
+        fmt="d",
+        cmap=CONFUSION_CMAP,
+        xticklabels=display_class_names,
+        yticklabels=display_class_names,
+        ax=ax,
+        cbar_kws={"label": "Number of spectra"},
+    )
+    ax.set_title("Total Confusion Matrix Across Folds")
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    color_class_tick_labels(ax)
     plt.tight_layout()
     plt.savefig(os.path.join(metrics_dir, "CONFUSION_MATRIX_TOTAL_5_FOLD.png"), dpi=300, bbox_inches="tight")
     if show_plots:
         plt.show()
     else:
-        plt.close()
+        plt.close(fig)
 
     row_sums = cm_total.sum(axis=1, keepdims=True)
     cm_normalized = np.divide(cm_total, row_sums, out=np.zeros_like(cm_total, dtype=float), where=row_sums != 0)
 
-    plt.figure(figsize=(7, 6))
-    sns.heatmap(cm_normalized, annot=True, fmt=".2f", cmap="Blues", xticklabels=class_names, yticklabels=class_names)
-    plt.title("Normalized Confusion Matrix Across Folds")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(
+        cm_normalized,
+        annot=True,
+        fmt=".2f",
+        cmap=CONFUSION_CMAP,
+        vmin=0,
+        vmax=1,
+        xticklabels=display_class_names,
+        yticklabels=display_class_names,
+        ax=ax,
+        cbar_kws={"label": "Row-normalized fraction"},
+    )
+    ax.set_title("Normalized Confusion Matrix Across Folds")
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    color_class_tick_labels(ax)
     plt.tight_layout()
     plt.savefig(os.path.join(metrics_dir, "CONFUSION_MATRIX_NORMALIZED_5_FOLD.png"), dpi=300, bbox_inches="tight")
     if show_plots:
         plt.show()
     else:
-        plt.close()
+        plt.close(fig)
 
     return cm_normalized
 
@@ -154,6 +231,7 @@ def plot_sample_difficulty_ranking(
     ax.set_ylabel("Sample_ID")
     ax.set_title(f"Sample Difficulty Ranking (hardest to easiest by {primary_metric})")
     ax.grid(True, axis="x", alpha=0.35)
+    ax.tick_params(axis="both", which="major", labelsize=13)
     ax.legend(loc="lower right")
 
     plt.tight_layout()
@@ -184,20 +262,37 @@ def save_prediction_maps_if_enabled(df_test, y_probs, y_pred, fold_number, maps_
     for (sample_id, map_id), map_df in plot_df.groupby(["Sample_ID", "Map_ID"], sort=False):
         fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
         panels = [
-            ("Binary_Label", "True label", "viridis"),
-            ("pred_prob", "Predicted probability", "magma"),
-            ("error", "Error", "Reds"),
+            ("Binary_Label", "True label", CLASS_CMAP, CLASS_NORM, "Class"),
+            ("pred_prob", "Predicted probability", PROBABILITY_CMAP, None, "Class 1 probability"),
+            ("error", "Error", ERROR_CMAP, ERROR_NORM, "Prediction outcome"),
         ]
 
-        for ax, (value_col, title, cmap) in zip(axes, panels):
+        for ax, panel in zip(axes, panels):
+            value_col, title, cmap = panel[:3]
             heatmap = map_df.pivot_table(index="y", columns="x", values=value_col)
-            im = ax.imshow(heatmap, origin="lower", cmap=cmap, vmin=0, vmax=1)
-            ax.set_title(title)
+            if value_col == "Binary_Label":
+                heatmap = 1 - heatmap
+            if len(panel) == 5:
+                _, _, _, norm, colorbar_label = panel
+                if norm is not None:
+                    im = ax.imshow(heatmap, origin="lower", cmap=cmap, norm=norm)
+                else:
+                    im = ax.imshow(heatmap, origin="lower", cmap=cmap, vmin=0, vmax=1)
+            else:
+                colorbar_label = title
+                im = ax.imshow(heatmap, origin="lower", cmap=cmap, vmin=0, vmax=1)
             ax.set_xlabel("x")
             ax.set_ylabel("y")
-            fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            cbar.set_label(colorbar_label)
+            if value_col == "Binary_Label":
+                cbar.set_ticks([0, 1])
+                cbar.set_ticklabels(["Class 1", "Class 0"])
+            elif value_col == "error":
+                cbar.set_ticks([0, 1])
+                cbar.set_ticklabels(["Correct", "Error"])
+            apply_axis_style(ax, show_grid=False)
 
-        plt.suptitle(f"Fold {fold_number} - Sample {sample_id} - Map {map_id}")
         plt.tight_layout()
         safe_sample = str(sample_id).replace("/", "_")
         safe_map = str(map_id).replace("/", "_")
