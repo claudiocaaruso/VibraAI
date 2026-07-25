@@ -16,7 +16,7 @@ from sklearn.model_selection import (GroupShuffleSplit, StratifiedGroupKFold,
 
 from src.model import ann_classification
 
-Y_PROB_BIAS = 0.47
+Y_PROB_BIAS = 0.49
 
 # ── preprocessing ─────────────────────────────────────────────────────────────
 
