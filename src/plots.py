@@ -18,7 +18,7 @@ from sklearn.metrics import auc as auc_score
 from sklearn.metrics import confusion_matrix, roc_curve
 
 CLASS_NAMES = ['Healthy', 'Tumoral']
-Y_PROB_BIAS = 0.47
+Y_PROB_BIAS = 0.49
 
 def _finish(fig, save_path, show):
     fig.tight_layout()

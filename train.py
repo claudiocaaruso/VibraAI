@@ -42,10 +42,10 @@ EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the
 SUBSAMPLE      = None        # cap on TOTAL rows kept (random, leakage-free); None = all
 
 # --- single-mode configuration ---
-ARCHITECTURE = 'S'              # 'S' | 'M' | 'L'
-N_PC         = 50             # number of PCA components
+ARCHITECTURE = 'L'              # 'S' | 'M' | 'L'
+N_PC         = 50               # number of PCA components
 SNV          = True             # SNV normalisation on/off
-CV           = 5            # None (single split) | 5 | 10
+CV           = 5                # None (single split) | 5 | 10
 
 # --- grid-mode variants (only these two sweep; SNV and CV stay fixed above) ---
 ARCHITECTURE_VARIANTS = ['S', 'M', 'L']
