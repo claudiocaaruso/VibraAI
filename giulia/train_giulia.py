@@ -55,18 +55,20 @@ DATA_PATH = first_existing_path(
     ]
 )
 # Outputs are saved outside the cloned repository.
-OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results")
+USE_DROPOUT = False
+OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results", "NoDropout" if not USE_DROPOUT else "")
+SAVE_FAIR_HISTORY = True
 
 #   "single" -> one complete run with detailed outputs, maps and models
 #   "grid"   -> many lightweight runs, only comparison tables
 MODE = "grid"
 
-EXPERIMENT_NAME = "2/20_vs_all_other___comparisonS/M/L"
+EXPERIMENT_NAME = "2/20_vs_6___comparisonS/M/L"
 
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
 CLASS_1_LABELS = [2, 20]
-CLASS_0_LABELS = "all_other"
+CLASS_0_LABELS = [6]
 
 USE_SNV = True
 SNV_STD_EPS = 1e-8
@@ -144,6 +146,10 @@ def build_config(class_0_labels, class_1_labels, filtered_class_counts):
         "VALIDATION_SIZE_WITHIN_TRAIN": VALIDATION_SIZE_WITHIN_TRAIN,
         "N_COMPONENTS": N_COMPONENTS,
         "MODEL_SIZE": MODEL_SIZE,
+        "USE_DROPOUT": USE_DROPOUT,
+        "DROPOUT_RATE": 0.2 if USE_DROPOUT else 0,
+        "SAVE_FAIR_HISTORY": SAVE_FAIR_HISTORY,
+        "FAIR_HISTORY_SCOPE": "train_and_validation_after_each_epoch_in_inference_mode",
         "EPOCHS": EPOCHS,
         "BATCH_SIZE": BATCH_SIZE,
         "CLASSIFICATION_THRESHOLD": CLASSIFICATION_THRESHOLD,
@@ -274,6 +280,9 @@ def run_grid():
                 model_size,
                 EPOCHS,
                 batch_size,
+                use_dropout=USE_DROPOUT,
+                save_fair_history=SAVE_FAIR_HISTORY,
+                classification_threshold=threshold,
                 verbose=0,
             )
 
@@ -369,6 +378,7 @@ def run_grid():
                 "classification_threshold": threshold,
                 "n_folds": N_FOLDS,
                 "use_snv": USE_SNV,
+                "use_dropout": USE_DROPOUT,
                 "balance_classes": BALANCE_CLASSES,
                 "smooth_prediction_probs": SMOOTH_PREDICTION_PROBS,
                 "prediction_smoothing_method": PREDICTION_SMOOTHING_METHOD if SMOOTH_PREDICTION_PROBS else "none",
@@ -536,7 +546,19 @@ def main():
         if SAVE_PCA_ARTIFACTS:
             save_pca_artifacts(pca, fold_number, dirs["params"], dirs["tables"])
 
-        model, history = train_model(X_train, y_train, X_val, y_val, MODEL_SIZE, EPOCHS, BATCH_SIZE, verbose=1)
+        model, history = train_model(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            MODEL_SIZE,
+            EPOCHS,
+            BATCH_SIZE,
+            use_dropout=USE_DROPOUT,
+            save_fair_history=SAVE_FAIR_HISTORY,
+            classification_threshold=CLASSIFICATION_THRESHOLD,
+            verbose=1,
+        )
         if fold_number == 1:
             model.summary()
 
@@ -659,6 +681,7 @@ def main():
         "n_components": N_COMPONENTS,
         "n_folds": N_FOLDS,
         "use_snv": USE_SNV,
+        "use_dropout": USE_DROPOUT,
         "feature_mode": "center_spectrum_only",
         "balance_classes": BALANCE_CLASSES,
         "balancing_scope": "training_only",

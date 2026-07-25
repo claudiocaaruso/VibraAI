@@ -6,6 +6,7 @@ import pandas as pd
 import tensorflow as tf
 from scipy.ndimage import generic_filter
 from sklearn.decomposition import PCA
+from sklearn.metrics import accuracy_score, recall_score, roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
 
@@ -15,8 +16,54 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from src.model import ann_classification
+from src.model_no_dropout import ann_classification as ann_classification_no_dropout
 
 from data_giulia import class_counts
+
+
+def binary_crossentropy_from_probs(y_true, y_probs):
+    y_true = np.asarray(y_true).reshape(-1, 1).astype(np.float32)
+    y_probs = np.asarray(y_probs).reshape(-1, 1).astype(np.float32)
+    return float(tf.keras.losses.binary_crossentropy(y_true, y_probs).numpy().mean())
+
+
+def fair_binary_metrics(y_true, y_probs, threshold):
+    y_true = np.asarray(y_true).astype(int)
+    y_probs = np.asarray(y_probs).reshape(-1)
+    y_pred = (y_probs > threshold).astype(int)
+
+    return {
+        "loss": binary_crossentropy_from_probs(y_true, y_probs),
+        "accuracy": accuracy_score(y_true, y_pred),
+        "sensitivity": recall_score(y_true, y_pred, zero_division=0),
+        "auc": roc_auc_score(y_true, y_probs) if len(np.unique(y_true)) == 2 else np.nan,
+    }
+
+
+class FairHistoryCallback(tf.keras.callbacks.Callback):
+    """Recompute train and validation metrics in inference mode after each epoch."""
+
+    def __init__(self, X_train, y_train, X_val, y_val, threshold):
+        super().__init__()
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_val = X_val
+        self.y_val = y_val
+        self.threshold = threshold
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = {} if logs is None else logs
+
+        train_probs = self.model.predict(self.X_train, verbose=0).reshape(-1)
+        val_probs = self.model.predict(self.X_val, verbose=0).reshape(-1)
+
+        train_metrics = fair_binary_metrics(self.y_train, train_probs, self.threshold)
+        val_metrics = fair_binary_metrics(self.y_val, val_probs, self.threshold)
+
+        for name, value in train_metrics.items():
+            logs[f"fair_train_{name}"] = value
+        for name, value in val_metrics.items():
+            logs[f"fair_val_{name}"] = value
 
 
 def snv(X, eps=1e-8):
@@ -94,23 +141,41 @@ def prepare_fold(X, train_idx, val_idx, test_idx, n_components, use_snv, pca_see
     return X_train_pca, X_val_pca, X_test_pca, pca
 
 
-def train_model(X_train, y_train, X_val, y_val, model_size, epochs, batch_size, verbose=1):
+def train_model(
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    model_size,
+    epochs,
+    batch_size,
+    use_dropout=True,
+    save_fair_history=True,
+    classification_threshold=0.5,
+    verbose=1,
+):
     """Build and fit an ANN with early stopping on validation AUC."""
-    model = ann_classification(num_components=X_train.shape[1], size=model_size)
-    callbacks = [
-        tf.keras.callbacks.EarlyStopping(
-            monitor="val_auc",
-            mode="max",
-            patience=10,
-            restore_best_weights=True,
-        ),
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss",
-            factor=0.5,
-            patience=4,
-            min_lr=1e-6,
-        ),
-    ]
+    model_builder = ann_classification if use_dropout else ann_classification_no_dropout
+    model = model_builder(num_components=X_train.shape[1], size=model_size)
+    callbacks = []
+    if save_fair_history:
+        callbacks.append(FairHistoryCallback(X_train, y_train, X_val, y_val, classification_threshold))
+    callbacks.extend(
+        [
+            tf.keras.callbacks.EarlyStopping(
+                monitor="val_auc",
+                mode="max",
+                patience=10,
+                restore_best_weights=True,
+            ),
+            tf.keras.callbacks.ReduceLROnPlateau(
+                monitor="val_loss",
+                factor=0.5,
+                patience=4,
+                min_lr=1e-6,
+            ),
+        ]
+    )
     history = model.fit(
         X_train,
         y_train,
