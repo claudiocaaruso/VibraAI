@@ -59,14 +59,14 @@ OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results")
 
 #   "single" -> one complete run with detailed outputs, maps and models
 #   "grid"   -> many lightweight runs, only comparison tables
-MODE = "single"
+MODE = "grid"
 
-EXPERIMENT_NAME = "2-20_VS_all_other(No_smoothing)"
+EXPERIMENT_NAME = "2-20_VS_all_other(S,M,Lcomparison)"
 
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
 CLASS_1_LABELS = [2, 20]
-CLASS_0_LABELS = [6]
+CLASS_0_LABELS = "all_other"
 
 USE_SNV = True
 SNV_STD_EPS = 1e-8
@@ -86,21 +86,21 @@ BATCH_SIZE = 8192
 CLASSIFICATION_THRESHOLD = 0.49
 
 # Grid mode variants. These are ignored when MODE = "single".
-MODEL_SIZE_VARIANTS = ["S"]
-N_COMPONENTS_VARIANTS = [30, 50, 75, 100, 200, 300]
-BATCH_SIZE_VARIANTS = [512, 1024, 2048, 4096, 8192]
+MODEL_SIZE_VARIANTS = ['S', 'M', 'L']
+N_COMPONENTS_VARIANTS = [50]
+BATCH_SIZE_VARIANTS = [8192]
 CLASSIFICATION_THRESHOLD_VARIANTS = [0.49]
 SAVE_GRID_HISTORY_PLOTS = True
 SHOW_GRID_HISTORY_PLOTS = False
 
-SMOOTH_PREDICTION_PROBS = False
+SMOOTH_PREDICTION_PROBS = True
 PREDICTION_SMOOTHING_METHOD = "mean"
 PREDICTION_SMOOTHING_KERNEL_SIZE = 5
 
 RANDOM_STATE = 43
 
 SAVE_PCA_ARTIFACTS = False
-SAVE_PREDICTION_MAPS = True
+SAVE_PREDICTION_MAPS = False
 
 SAMPLE_RANKING_PRIMARY_METRIC = "class_1_f1"
 SAMPLE_RANKING_SECONDARY_METRIC = "class_1_recall"
@@ -165,6 +165,17 @@ def build_config(class_0_labels, class_1_labels, filtered_class_counts):
         "SAMPLE_RANKING_SECONDARY_METRIC": SAMPLE_RANKING_SECONDARY_METRIC,
         "SHOW_PLOTS": SHOW_PLOTS,
     }
+
+
+def prefix_train_metrics(metrics):
+    """Rename evaluation metrics computed on the training split."""
+    prefixed = {}
+    for key, value in metrics.items():
+        if key.startswith("test_"):
+            prefixed[f"train_{key.removeprefix('test_')}"] = value
+        else:
+            prefixed[f"train_{key}"] = value
+    return prefixed
 
 
 def run_grid():
@@ -241,6 +252,7 @@ def run_grid():
             y_train = y_all[train_idx]
             y_val = y_all[val_idx]
             y_test = y_all[test_idx]
+            df_train = df_filtered.iloc[train_idx].copy()
             df_test = df_filtered.iloc[test_idx].copy()
 
             X_train, X_val, X_test, _ = prepare_fold(
@@ -286,6 +298,18 @@ def run_grid():
                     SHOW_GRID_HISTORY_PLOTS,
                 )
 
+            train_raw_probs = model.predict(X_train, verbose=0).reshape(-1)
+            train_prediction_metrics, _, _, _ = evaluate_predictions(
+                df_train,
+                y_train,
+                train_raw_probs,
+                threshold,
+                class_names,
+                MAP_GROUP_COLUMNS,
+                SMOOTH_PREDICTION_PROBS,
+                PREDICTION_SMOOTHING_METHOD,
+                PREDICTION_SMOOTHING_KERNEL_SIZE,
+            )
             y_raw_probs = model.predict(X_test, verbose=0).reshape(-1)
             prediction_metrics, _, _, _ = evaluate_predictions(
                 df_test,
@@ -314,13 +338,14 @@ def run_grid():
                 "validation_class_1_rate": y_val.mean(),
                 "test_class_1_rate": y_test.mean(),
             }
+            row.update(prefix_train_metrics(train_prediction_metrics))
             row.update(prediction_metrics)
             config_fold_rows.append(row)
             fold_rows.append(row)
             print(
                 f"  fold {fold_number}/{N_FOLDS}: "
-                f"auc={row['test_auc']:.4f}, acc={row['test_accuracy']:.4f}, "
-                f"class_1_f1={row['class_1_f1']:.4f}"
+                f"train_auc={row['train_auc']:.4f}, test_auc={row['test_auc']:.4f}, "
+                f"train_class_1_f1={row['train_class_1_f1']:.4f}, test_class_1_f1={row['class_1_f1']:.4f}"
             )
 
             del model, X_train, X_val, X_test
@@ -352,6 +377,16 @@ def run_grid():
                 "std_test_auc": stds.get("test_auc"),
                 "mean_test_accuracy": means.get("test_accuracy"),
                 "std_test_accuracy": stds.get("test_accuracy"),
+                "mean_train_auc": means.get("train_auc"),
+                "std_train_auc": stds.get("train_auc"),
+                "mean_train_accuracy": means.get("train_accuracy"),
+                "std_train_accuracy": stds.get("train_accuracy"),
+                "mean_train_class_1_precision": means.get("train_class_1_precision"),
+                "std_train_class_1_precision": stds.get("train_class_1_precision"),
+                "mean_train_class_1_recall": means.get("train_class_1_recall"),
+                "std_train_class_1_recall": stds.get("train_class_1_recall"),
+                "mean_train_class_1_f1": means.get("train_class_1_f1"),
+                "std_train_class_1_f1": stds.get("train_class_1_f1"),
                 "mean_class_1_precision": means.get("class_1_precision"),
                 "std_class_1_precision": stds.get("class_1_precision"),
                 "mean_class_1_recall": means.get("class_1_recall"),
@@ -445,6 +480,7 @@ def main():
         train_idx = balance_indices(y_all, train_idx_unbalanced, balance_classes=BALANCE_CLASSES, seed=fold_seed)
 
         df_train_unbalanced = df_filtered.iloc[train_idx_unbalanced].copy()
+        df_train = df_filtered.iloc[train_idx].copy()
         df_test = df_filtered.iloc[test_idx].copy()
 
         y_train_unbalanced = y_all[train_idx_unbalanced]
@@ -510,6 +546,18 @@ def main():
         plot_history(history_frame, dirs["metrics"], f"METRICS_FOLD_{fold_number}.png", f"Fold {fold_number}", SHOW_PLOTS)
 
         test_metrics = model.evaluate(X_test, y_test, verbose=0, return_dict=True)
+        train_raw_probs = model.predict(X_train, verbose=0).reshape(-1)
+        train_prediction_metrics, _, _, _ = evaluate_predictions(
+            df_train,
+            y_train,
+            train_raw_probs,
+            CLASSIFICATION_THRESHOLD,
+            class_names,
+            MAP_GROUP_COLUMNS,
+            SMOOTH_PREDICTION_PROBS,
+            PREDICTION_SMOOTHING_METHOD,
+            PREDICTION_SMOOTHING_KERNEL_SIZE,
+        )
         y_raw_probs = model.predict(X_test, verbose=0).reshape(-1)
         prediction_metrics, cm, y_pred_probs, y_pred_classes = evaluate_predictions(
             df_test,
@@ -553,6 +601,7 @@ def main():
             "validation_sample_ids": ", ".join(sorted(val_groups)),
             "test_sample_ids": ", ".join(sorted(test_groups)),
         }
+        fold_result.update(prefix_train_metrics(train_prediction_metrics))
         fold_result.update(prediction_metrics)
         fold_results.append(fold_result)
         sample_results.extend(compute_sample_results(fold_number, y_test, y_pred_probs, y_pred_classes, groups_test, class_names))
@@ -563,6 +612,13 @@ def main():
         model.save(model_path)
         model.save_weights(weights_path)
 
+        print(
+            f"Fold {fold_number} train - "
+            f"accuracy: {fold_result['train_accuracy']:.4f}, "
+            f"auc: {fold_result['train_auc']:.4f}, "
+            f"class_1 recall: {fold_result['train_class_1_recall']:.4f}, "
+            f"class_1 precision: {fold_result['train_class_1_precision']:.4f}"
+        )
         print(
             f"Fold {fold_number} test - "
             f"accuracy: {fold_result['test_accuracy']:.4f}, "
@@ -615,6 +671,16 @@ def main():
         "std_test_auc": summary_std.get("test_auc"),
         "mean_test_accuracy": summary_mean.get("test_accuracy"),
         "std_test_accuracy": summary_std.get("test_accuracy"),
+        "mean_train_auc": summary_mean.get("train_auc"),
+        "std_train_auc": summary_std.get("train_auc"),
+        "mean_train_accuracy": summary_mean.get("train_accuracy"),
+        "std_train_accuracy": summary_std.get("train_accuracy"),
+        "mean_train_class_1_precision": summary_mean.get("train_class_1_precision"),
+        "std_train_class_1_precision": summary_std.get("train_class_1_precision"),
+        "mean_train_class_1_recall": summary_mean.get("train_class_1_recall"),
+        "std_train_class_1_recall": summary_std.get("train_class_1_recall"),
+        "mean_train_class_1_f1": summary_mean.get("train_class_1_f1"),
+        "std_train_class_1_f1": summary_std.get("train_class_1_f1"),
         "mean_class_1_precision": summary_mean.get("class_1_precision"),
         "std_class_1_precision": summary_std.get("class_1_precision"),
         "mean_class_1_recall": summary_mean.get("class_1_recall"),
@@ -648,7 +714,18 @@ def main():
     print("\n" + "=" * 70)
     print("5-FOLD SUMMARY")
     print("=" * 70)
-    for metric_name in ["test_accuracy", "test_auc", "class_1_precision", "class_1_recall", "class_1_f1"]:
+    for metric_name in [
+        "train_accuracy",
+        "train_auc",
+        "train_class_1_precision",
+        "train_class_1_recall",
+        "train_class_1_f1",
+        "test_accuracy",
+        "test_auc",
+        "class_1_precision",
+        "class_1_recall",
+        "class_1_f1",
+    ]:
         print(f"{metric_name}: {summary_mean[metric_name]:.4f} +/- {summary_std[metric_name]:.4f}")
     print(f"\nRun saved at: {base_save_dir}")
 

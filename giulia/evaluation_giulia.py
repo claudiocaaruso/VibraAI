@@ -26,7 +26,9 @@ def history_to_frame(history, fold_number):
 
 
 def summarize_histories(history_frames):
-    history_all = pd.concat(history_frames, ignore_index=True)
+    min_epoch_count = min(len(frame) for frame in history_frames)
+    trimmed_frames = [frame.iloc[:min_epoch_count].copy() for frame in history_frames]
+    history_all = pd.concat(trimmed_frames, ignore_index=True)
     metric_cols = [col for col in history_all.columns if col not in ["fold", "epoch"]]
     grouped = history_all.groupby("epoch")[metric_cols]
     return history_all, grouped.mean().reset_index(), grouped.std().reset_index()

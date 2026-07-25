@@ -17,6 +17,11 @@ metric_images/
 *.pkl
 classification_report.txt
 
+# Keep generated PNG images visible only for Giulia training results.
+!giulia/train results/
+!giulia/train results/**/
+!giulia/train results/**/*.png
+
 # CSV outputs (keep the committed dataset summary)
 *.csv
 !dataset_statistics_summary.csv
