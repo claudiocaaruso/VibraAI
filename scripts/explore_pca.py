@@ -14,6 +14,22 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 
+plt.rcParams.update(
+    {
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman", "CMU Serif", "Times New Roman", "DejaVu Serif"],
+        "mathtext.fontset": "cm",
+        "font.size": 13,
+        "figure.titlesize": 14,
+        "axes.titlesize": 14,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12,
+        "legend.title_fontsize": 12,
+    }
+)
+
 ROOT        = Path(__file__).resolve().parent.parent
 SPECTRAL_DS = ROOT / 'datasets' / 'spectral_dataset.parquet'
 

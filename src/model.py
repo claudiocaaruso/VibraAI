@@ -18,9 +18,9 @@ def ann_classification(num_components, size):
 
     if size == 'S':
         model.add(Dense(16, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.4))
+        model.add(Dropout(rate=0.2))
         model.add(Dense(8,  activation='relu'))
-        model.add(Dropout(rate=0.4))
+        # model.add(Dropout(rate=0.4))
     elif size == 'M':
         model.add(Dense(64, activation='relu', input_shape=(num_components,)))
         model.add(Dropout(rate=0.4))

@@ -25,7 +25,7 @@ from itertools import product
 from pathlib import Path
 from src import plots
 from src.pipeline import (balance_indices, evaluate_fold, make_folds,
-                          prepare_fold, summarize_metrics, train_model)
+                          prepare_fold, set_seed, summarize_metrics, train_model)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -39,6 +39,7 @@ MODE = 'single'                 # 'single' or 'grid'
 # --- dataset & labels (fully configurable) ---
 TUMOR_LABELS   = [2,20]     # mapped to the positive class (1 = Tumoral)
 EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
+# EXCLUDE_LABELS = [-1, 15]     
 SUBSAMPLE      = None        # cap on TOTAL rows kept (random, leakage-free); None = all
 
 # --- single-mode configuration ---
@@ -58,7 +59,7 @@ BALANCE_CAP = 500000           # max rows PER CLASS kept after balancing the tra
 
 # --- training hyper-parameters ---
 EPOCHS     = 100                # max epochs 
-BATCH_SIZE = int(8192/2)
+BATCH_SIZE = int(8192)
 # Further training knobs live deeper in the code:
 #   - early-stopping patience, LR schedule  -> src/pipeline.py  (train_model)
 #   - layers / optimizer / loss / metrics   -> src/model.py     (ann_classification)
@@ -72,6 +73,8 @@ SHOW_PLOTS   = (MODE == 'single')
 if not SHOW_PLOTS:
     plt.switch_backend('Agg')     # headless: figures are saved, never displayed
 
+set_seed(43)
+
 # ══════════════════════════════ LOAD DATA ═════════════════════════════════════
 
 print("Loading spectral dataset …")
@@ -82,7 +85,7 @@ df = df[~df['Label'].isin(EXCLUDE_LABELS)].copy()
 df['y'] = df['Label'].isin(TUMOR_LABELS).astype(int)
 
 if SUBSAMPLE and len(df) > SUBSAMPLE:
-    df = df.sample(SUBSAMPLE, random_state=42).reset_index(drop=True)
+    df = df.sample(SUBSAMPLE, random_state=43).reset_index(drop=True)
 
 X      = df[band_cols].to_numpy(dtype=np.float32)
 y      = df['y'].to_numpy()
@@ -110,7 +113,7 @@ all_summaries, all_folds = [], []
 
 folds   = make_folds(y, groups, CV, group_aware=GROUP_AWARE)
 n_folds = len(folds)
-acc     = defaultdict(lambda: {'hist': [], 'metrics': [], 'roc': []})
+acc     = defaultdict(lambda: {'hist': [], 'metrics': [], 'train_metrics': [], 'roc': []})
 
 for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
     if BALANCE:
@@ -123,6 +126,7 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
         print(f"\n{'#'*64}\n  cv={CV} snv={SNV} | fold {fi}/{n_folds} "
               f"| architecture={architecture} n_pc={n_pc}\n{'#'*64}")
         tf.keras.backend.clear_session()
+        set_seed(43)
         model, history = train_model(
             X_tr[:, :n_pc], y_tr, X_val[:, :n_pc], y_val, architecture,
             verbose=1 if MODE == 'single' else 0,
@@ -131,11 +135,19 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
         metrics, y_prob = evaluate_fold(model, X_te[:, :n_pc], y_te)
         metrics |= {'cv': CV, 'snv': SNV, 'architecture': architecture, 'n_pc': n_pc, 'fold': fi}
 
+        # Fair train score: dropout OFF (inference mode), same threshold/metrics as test —
+        # comparable to the val/test numbers, unlike Keras's noisy in-training running average.
+        train_metrics, _ = evaluate_fold(model, X_tr[:, :n_pc], y_tr)
+        train_metrics |= {'cv': CV, 'snv': SNV, 'architecture': architecture, 'n_pc': n_pc, 'fold': fi}
+
         store = acc[(architecture, n_pc)]
         store['hist'].append(history.history)
         store['metrics'].append(metrics)
+        store['train_metrics'].append(train_metrics)
         store['roc'].append((y_te, y_prob))
-        print(f"  AUC={metrics['auc']:.4f} acc={metrics['accuracy']:.4f} "
+        print(f"  train: AUC={train_metrics['auc']:.4f} acc={train_metrics['accuracy']:.4f} "
+              f"recall={train_metrics['recall']:.4f} f1={train_metrics['f1']:.4f}")
+        print(f"  test:  AUC={metrics['auc']:.4f} acc={metrics['accuracy']:.4f} "
               f"recall={metrics['recall']:.4f} f1={metrics['f1']:.4f}")
 
     del X_tr, X_val, X_te; gc.collect()
@@ -144,13 +156,16 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
 
 for (architecture, n_pc), store in acc.items():
     per_fold_df, summary = summarize_metrics(store['metrics'])
+    train_per_fold_df, train_summary = summarize_metrics(store['train_metrics'])
     summary |= {'cv': CV, 'snv': SNV, 'architecture': architecture,
                 'n_pc': n_pc, 'n_folds': n_folds}
     all_summaries.append(summary)
     all_folds.extend(store['metrics'])
 
     tag = f"cv{CV}_snv{int(SNV)}_{architecture}_PC{n_pc}"
-    print(f"\n=== {tag} === AUC {summary['auc_mean']:.4f} ± {summary['auc_std']:.4f} "
+    print(f"\n=== {tag} === "
+          f"train AUC {train_summary['auc_mean']:.4f} ± {train_summary['auc_std']:.4f} "
+          f"vs test AUC {summary['auc_mean']:.4f} ± {summary['auc_std']:.4f} "
           f"| recall {summary['recall_mean']:.4f} | f1 {summary['f1_mean']:.4f}")
 
     save_dir = None
@@ -158,6 +173,7 @@ for (architecture, n_pc), store in acc.items():
         save_dir = results_dir / f'cv{CV}' / f'snv{int(SNV)}' / architecture / f'PC{n_pc}'
         save_dir.mkdir(parents=True, exist_ok=True)
         per_fold_df.to_csv(save_dir / 'fold_metrics.csv', index=False)
+        train_per_fold_df.to_csv(save_dir / 'fold_metrics_train.csv', index=False)
 
     def _p(name):                       # figure path or None
         return str(save_dir / name) if save_dir else None
