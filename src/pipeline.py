@@ -5,6 +5,8 @@ Covers preprocessing (SNV, PCA), class balancing, leakage-safe fold
 generation, model training, and metric computation. PCA is always fitted
 on the training portion only — see `prepare_fold`.
 """
+import random
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -17,6 +19,13 @@ from sklearn.model_selection import (GroupShuffleSplit, StratifiedGroupKFold,
 from src.model import ann_classification
 
 Y_PROB_BIAS = 0.49
+
+
+def set_seed(seed=43):
+    """Seed Python, NumPy, and TensorFlow RNGs for reproducible model init/training."""
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
 # ── preprocessing ─────────────────────────────────────────────────────────────
 
@@ -31,7 +40,7 @@ def snv(X):
     return (X - mu) / sd
 
 
-def balance_indices(y, idx, cap=None, seed=42):
+def balance_indices(y, idx, cap=None, seed=43):
     """Downsample every class within `idx` to the size of the minority class.
 
     Returns a shuffled subset of `idx`. Applied to TRAINING indices only so
@@ -49,7 +58,7 @@ def balance_indices(y, idx, cap=None, seed=42):
     return keep
 
 
-def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, use_snv, seed=42):
+def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, use_snv, seed=43):
     """SNV (optional) then PCA fitted on the TRAINING split only.
 
     Returns the train/val/test matrices projected onto `max_pc` components.
@@ -66,7 +75,7 @@ def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, use_snv, seed=42):
 
 # ── leakage-safe splitting ────────────────────────────────────────────────────
 
-def make_folds(y, groups, cv, group_aware=True, val_frac=0.15, test_frac=0.15, seed=42):
+def make_folds(y, groups, cv, group_aware=True, val_frac=0.1875, test_frac=0.15, seed=43):
     """Generate a list of (train_idx, val_idx, test_idx) tuples.
 
     cv=None  -> a single train/val/test split (one element).

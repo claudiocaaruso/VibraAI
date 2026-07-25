@@ -17,6 +17,22 @@ import seaborn as sns
 from sklearn.metrics import auc as auc_score
 from sklearn.metrics import confusion_matrix, roc_curve
 
+plt.rcParams.update(
+    {
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman", "CMU Serif", "Times New Roman", "DejaVu Serif"],
+        "mathtext.fontset": "cm",
+        "font.size": 13,
+        "figure.titlesize": 14,
+        "axes.titlesize": 14,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 12,
+        "legend.title_fontsize": 12,
+    }
+)
+
 CLASS_NAMES = ['Healthy', 'Tumoral']
 Y_PROB_BIAS = 0.49
 
@@ -56,7 +72,7 @@ def plot_training_curves(histories, title='', save_path=None, show=False):
         ax.legend(); ax.grid(True, alpha=0.3)
 
     if title:
-        fig.suptitle(title, fontsize=14)
+        fig.suptitle(title)
     _finish(fig, save_path, show)
 
 
@@ -90,7 +106,7 @@ def plot_roc(roc_data, title='', save_path=None, show=False):
 
     ax.plot([0, 1], [0, 1], ls='--', color='gray', lw=1)
     ax.set_xlabel('False Positive Rate'); ax.set_ylabel('True Positive Rate')
-    ax.set_title(title or 'ROC'); ax.legend(loc='lower right', fontsize=8)
+    ax.set_title(title or 'ROC'); ax.legend(loc='lower right')
     _finish(fig, save_path, show)
 
 

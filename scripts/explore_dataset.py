@@ -10,6 +10,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
+plt.rcParams.update(
+    {
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman", "CMU Serif", "Times New Roman", "DejaVu Serif"],
+        "mathtext.fontset": "cm",
+        "font.size": 15,
+        "figure.titlesize": 16,
+        "axes.titlesize": 16,
+        "axes.labelsize": 16,
+        "xtick.labelsize": 15,
+        "legend.fontsize": 16,
+        "legend.title_fontsize": 16,
+    }
+)
+
 ROOT        = Path(__file__).resolve().parent.parent
 SPECTRAL_DS = ROOT / 'datasets' / 'spectral_dataset.parquet'
 LABELS_CSV  = ROOT / 'dataset_statistics_summary.csv'
@@ -51,8 +66,7 @@ plt.tight_layout(); plt.show()
 unique_labels = df['Label'].unique()
 avg_spectra   = {}
 
-#for label in unique_labels:
-for label in [2]:
+for label in unique_labels:
     temp_avg = df.loc[df['Label'] == label, band_columns].mean()
     temp_std = df.loc[df['Label'] == label, band_columns].std()
     avg_spectra[label] = (temp_avg, temp_std)
@@ -83,12 +97,11 @@ plt.show()
 # %% --- normalised spectra comparison with manual spectra selection ---
 
 plt.figure(figsize=(10, 5))
-for label in [2, 6, 4, 5]: 
+for label in [2, 0, 15, -1]: 
     name = label_names.get(label, 'Unknown')
     temp_mean = avg_spectra[label][0].values.mean()
     temp_std = avg_spectra[label][0].values.std()
     plt.plot((avg_spectra[label][0].values - temp_mean)/temp_std , label=f'Label {label} ({name})')
-plt.title("Normalised spectra comparison")
 plt.xlabel("Band Index"); plt.ylabel("Intensity"); plt.grid(True); plt.legend()
 plt.show()
 
@@ -103,25 +116,28 @@ tick_labels = [f"{label_names.get(label, 'Unknown')} - {label} "
 
 plt.figure(figsize=(10, 5))
 label_counts.plot(kind='barh')
-plt.yticks(range(len(label_counts)), tick_labels)
-plt.xlabel('Number of pixels')
-plt.tight_layout(); plt.show()
+plt.yticks(range(len(label_counts)), tick_labels, fontsize=18)
+plt.xlabel('Number of pixels'); plt.ylabel('')
+plt.tight_layout()
+plt.show()
 
 # %% --- label 2 vs rest ---
 
-#label_counts = label_counts.drop([-1, 15])
+label_counts = label_counts.drop([-1, 15])
 count_2   = label_counts.loc[2]
 count_rest = label_counts.drop(2).sum()
 pd.Series({'label 2': count_2, 'other valid labels': count_rest}).plot(kind='barh',
                                                                         figsize=(10, 5))
 plt.xlabel('Number of pixels')
+plt.yticks(fontsize=18)
+plt.tight_layout()
 plt.show()
 
 # %% --- tumoral / healthy / discarded spatial maps ---
 sample_IDs = np.append(df['Sample_ID'].unique(), None)
 TUMOR_LABELS    = [2, 20]     # pixels treated as tumoral
 DISCARD_LABELS  = [-1, 15]       # pixels discarded; everything else is healthy
-SELECTED_SAMPLE = sample_IDs[-1]           # a Sample_ID to plot just one, or [-1] to loop over all
+SELECTED_SAMPLE = sample_IDs[10]           # a Sample_ID to plot just one, or [-1] to loop over all
 
 # 0 = discarded, 1 = healthy, 2 = tumoral
 cmap = ListedColormap(['white', 'forestgreen', 'darkred'])
@@ -144,9 +160,7 @@ def plot_category_map(sample_id):
     plt.figure(figsize=(8, 6))
     im = plt.imshow(grid, cmap=cmap, norm=norm, origin='lower')
     cbar = plt.colorbar(im, ticks=[0, 1, 2])
-    cbar.ax.set_yticklabels(['Discarded', 'Healthy', 'Tumoral'])
-    plt.title(f"Sample {sample_id} – tumoral / healthy / discarded")
-    plt.xlabel("x"); plt.ylabel("y")
+    cbar.ax.set_yticklabels(['Discarded', 'Healthy', 'Tumoral'], fontsize=18)
     plt.tight_layout(); plt.show()
 
 
@@ -162,7 +176,7 @@ else:
 TUMOR_MACRO     = [2,20]     # pixels treated as tumoral
 OTHER_CLASS     = 4              # the single class to distinguish from tumoral
 INVALID_LABELS  = [-1, 15]       # pixels treated as invalid (shown white)
-SELECTED_SAMPLE_BIN = sample_IDs[-1]   # a Sample_ID to plot just one, or [-1] to loop over all
+SELECTED_SAMPLE_BIN = sample_IDs[10]   # a Sample_ID to plot just one, or [-1] to loop over all
 
 # 0 = invalid (white), 1 = other valid (gray), 2 = chosen (yellow), 3 = tumoral
 cmap_bin = ListedColormap(['white', 'lightgray', 'yellow', 'darkred'])
@@ -189,9 +203,7 @@ def plot_binary_map(sample_id):
     plt.figure(figsize=(8, 6))
     im = plt.imshow(grid, cmap=cmap_bin, norm=norm_bin, origin='lower')
     cbar = plt.colorbar(im, ticks=[0, 1, 2, 3])
-    cbar.ax.set_yticklabels(['Discarded', 'Other', other_name , 'Tumoral'])
-    plt.title(f"Sample {sample_id} – tumoral vs {other_name}")
-    plt.xlabel("x"); plt.ylabel("y")
+    cbar.ax.set_yticklabels(['Discarded', 'Other', other_name , 'Tumoral'], fontsize=18)
     plt.tight_layout(); plt.show()
 
 
