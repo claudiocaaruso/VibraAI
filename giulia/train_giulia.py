@@ -57,13 +57,13 @@ DATA_PATH = first_existing_path(
 # Outputs are saved outside the cloned repository.
 USE_DROPOUT = False
 OUTPUT_BASE_DIR = os.path.join(WORKSPACE_ROOT, "train_results", "NoDropout" if not USE_DROPOUT else "")
-SAVE_FAIR_HISTORY = True
+SAVE_FAIR_HISTORY = False
 
 #   "single" -> one complete run with detailed outputs, maps and models
 #   "grid"   -> many lightweight runs, only comparison tables
-MODE = "grid"
+MODE = "single"
 
-EXPERIMENT_NAME = "2/20_vs_6___comparisonS/M/L"
+EXPERIMENT_NAME = "s10_no_smooth"
 
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
@@ -79,10 +79,10 @@ N_FOLDS = 5
 GROUP_COLUMN = "Sample_ID"
 VALIDATION_SIZE_WITHIN_TRAIN = 0.1875
 
-N_COMPONENTS = 50
+N_COMPONENTS = 483
 PCA_RANDOM_STATE = 42
 
-MODEL_SIZE = "S"
+MODEL_SIZE = "L"
 EPOCHS = 100
 BATCH_SIZE = 8192
 CLASSIFICATION_THRESHOLD = 0.49
@@ -95,14 +95,14 @@ CLASSIFICATION_THRESHOLD_VARIANTS = [0.49]
 SAVE_GRID_HISTORY_PLOTS = True
 SHOW_GRID_HISTORY_PLOTS = False
 
-SMOOTH_PREDICTION_PROBS = False
+SMOOTH_PREDICTION_PROBS = True
 PREDICTION_SMOOTHING_METHOD = "mean"
-PREDICTION_SMOOTHING_KERNEL_SIZE = 3
+PREDICTION_SMOOTHING_KERNEL_SIZE = 5
 
 RANDOM_STATE = 43
 
 SAVE_PCA_ARTIFACTS = False
-SAVE_PREDICTION_MAPS = False
+SAVE_PREDICTION_MAPS = True
 
 SAMPLE_RANKING_PRIMARY_METRIC = "class_1_f1"
 SAMPLE_RANKING_SECONDARY_METRIC = "class_1_recall"
@@ -299,13 +299,6 @@ def run_grid():
                     index=False,
                 )
                 history_frames.append(history_frame)
-                plot_history(
-                    history_frame,
-                    config_metrics_dir,
-                    f"METRICS_FOLD_{fold_number}.png",
-                    f"{config_id} - Fold {fold_number}",
-                    SHOW_GRID_HISTORY_PLOTS,
-                )
 
             train_raw_probs = model.predict(X_train, verbose=0).reshape(-1)
             train_prediction_metrics, _, _, _ = evaluate_predictions(
@@ -365,7 +358,17 @@ def run_grid():
             history_all.to_csv(os.path.join(config_history_dir, "history_all_folds.csv"), index=False)
             history_mean.to_csv(os.path.join(config_history_dir, "history_mean.csv"), index=False)
             history_std.to_csv(os.path.join(config_history_dir, "history_std.csv"), index=False)
-            plot_mean_history(history_mean, history_std, config_metrics_dir, SHOW_GRID_HISTORY_PLOTS)
+            history_title = (
+                f"Training curves - cv{N_FOLDS}_snv{int(USE_SNV)}_"
+                f"{model_size}_PC{n_components}_B{batch_size}_tau{threshold}"
+            )
+            plot_mean_history(
+                history_mean,
+                history_std,
+                config_metrics_dir,
+                SHOW_GRID_HISTORY_PLOTS,
+                title_prefix=history_title,
+            )
 
         config_df = pd.DataFrame(config_fold_rows)
         _, means, stds = summarize_fold_metrics(config_df, exclude_cols=["fold"])

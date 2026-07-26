@@ -42,6 +42,11 @@ CONFUSION_CMAP = LinearSegmentedColormap.from_list(
     "confusion_blues",
     ["#ffffff", "#c6dbef", "#6baed6", "#08519c", "#08306b"],
 )
+HISTORY_Y_LIMITS = {
+    "loss": (0.0, 1.0),
+    "accuracy": (0.0, 1.0),
+    "auc": (0.0, 1.0),
+}
 
 
 def apply_axis_style(ax, show_grid=True):
@@ -63,26 +68,31 @@ def select_history_column(history_frame, preferred_col, fallback_col):
     return preferred_col if preferred_col in history_frame else fallback_col
 
 
+def apply_history_y_limits(ax, metric_key):
+    limits = HISTORY_Y_LIMITS.get(metric_key)
+    if limits is not None:
+        ax.set_ylim(*limits)
+
+
 def plot_history(history_frame, metrics_dir, filename, title_prefix, show_plots):
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     plots = [
-        ("fair_train_loss", "loss", "fair_val_loss", "val_loss", "Model Loss (Binary Crossentropy)", "Loss"),
-        ("fair_train_accuracy", "accuracy", "fair_val_accuracy", "val_accuracy", "Model Accuracy", "Accuracy"),
-        ("fair_train_auc", "auc", "fair_val_auc", "val_auc", "Model AUC", "AUC"),
+        ("loss", "fair_train_loss", "loss", "fair_val_loss", "val_loss", "Model Loss (Binary Crossentropy)", "Loss"),
+        ("accuracy", "fair_train_accuracy", "accuracy", "fair_val_accuracy", "val_accuracy", "Model Accuracy", "Accuracy"),
+        ("auc", "fair_train_auc", "auc", "fair_val_auc", "val_auc", "Model AUC", "AUC"),
     ]
 
-    for ax, (preferred_train_col, fallback_train_col, preferred_val_col, fallback_val_col, title, ylabel) in zip(axes, plots):
+    for ax, (metric_key, preferred_train_col, fallback_train_col, preferred_val_col, fallback_val_col, title, ylabel) in zip(axes, plots):
         train_col = select_history_column(history_frame, preferred_train_col, fallback_train_col)
         val_col = select_history_column(history_frame, preferred_val_col, fallback_val_col)
         if train_col in history_frame:
-            train_label = "Train (inference)" if train_col.startswith("fair_") else "Train"
-            ax.plot(history_frame["epoch"], history_frame[train_col], label=train_label, linewidth=2)
+            ax.plot(history_frame["epoch"], history_frame[train_col], label="Train", linewidth=2)
         if val_col in history_frame:
-            val_label = "Validation (inference)" if val_col.startswith("fair_") else "Validation"
-            ax.plot(history_frame["epoch"], history_frame[val_col], label=val_label, linestyle="--", linewidth=2)
+            ax.plot(history_frame["epoch"], history_frame[val_col], label="Validation", linestyle="--", linewidth=2)
         ax.set_title(f"{title_prefix} - {title}")
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
+        apply_history_y_limits(ax, metric_key)
         apply_axis_style(ax)
         ax.legend()
 
@@ -94,38 +104,41 @@ def plot_history(history_frame, metrics_dir, filename, title_prefix, show_plots)
         plt.close(fig)
 
 
-def plot_mean_history(mean_history, std_history, metrics_dir, show_plots):
+def plot_mean_history(mean_history, std_history, metrics_dir, show_plots, title_prefix=None, filename="METRICS_MEAN_5_FOLD.png"):
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     plots = [
-        ("fair_train_loss", "loss", "fair_val_loss", "val_loss", "Model Loss (Binary Crossentropy)", "Loss"),
-        ("fair_train_accuracy", "accuracy", "fair_val_accuracy", "val_accuracy", "Model Accuracy", "Accuracy"),
-        ("fair_train_auc", "auc", "fair_val_auc", "val_auc", "Model AUC", "AUC"),
+        ("loss", "fair_train_loss", "loss", "fair_val_loss", "val_loss", "Model Loss (Binary Crossentropy)", "Loss"),
+        ("accuracy", "fair_train_accuracy", "accuracy", "fair_val_accuracy", "val_accuracy", "Model Accuracy", "Accuracy"),
+        ("auc", "fair_train_auc", "auc", "fair_val_auc", "val_auc", "Model AUC", "AUC"),
     ]
 
     epochs = mean_history["epoch"].values
-    for ax, (preferred_train_col, fallback_train_col, preferred_val_col, fallback_val_col, title, ylabel) in zip(axes, plots):
+    for ax, (metric_key, preferred_train_col, fallback_train_col, preferred_val_col, fallback_val_col, title, ylabel) in zip(axes, plots):
         train_col = select_history_column(mean_history, preferred_train_col, fallback_train_col)
         val_col = select_history_column(mean_history, preferred_val_col, fallback_val_col)
         if train_col in mean_history:
             train_mean = mean_history[train_col].values
             train_std = std_history[train_col].fillna(0).values
-            train_label = "Train Mean (inference)" if train_col.startswith("fair_") else "Train Mean"
-            ax.plot(epochs, train_mean, label=train_label, color="#1f77b4", linewidth=2)
+            ax.plot(epochs, train_mean, label="Train", color="#1f77b4", linewidth=2)
             ax.fill_between(epochs, train_mean - train_std, train_mean + train_std, color="#1f77b4", alpha=0.15)
         if val_col in mean_history:
             val_mean = mean_history[val_col].values
             val_std = std_history[val_col].fillna(0).values
-            val_label = "Validation Mean (inference)" if val_col.startswith("fair_") else "Validation Mean"
-            ax.plot(epochs, val_mean, label=val_label, color="#ff7f0e", linestyle="--", linewidth=2)
+            ax.plot(epochs, val_mean, label="Validation", color="#ff7f0e", linestyle="--", linewidth=2)
             ax.fill_between(epochs, val_mean - val_std, val_mean + val_std, color="#ff7f0e", alpha=0.15)
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
+        apply_history_y_limits(ax, metric_key)
         apply_axis_style(ax)
         ax.legend()
 
-    plt.tight_layout()
-    plt.savefig(os.path.join(metrics_dir, "METRICS_MEAN_5_FOLD.png"), dpi=300, bbox_inches="tight")
+    if title_prefix:
+        fig.suptitle(title_prefix)
+        plt.tight_layout(rect=[0, 0, 1, 0.94])
+    else:
+        plt.tight_layout()
+    plt.savefig(os.path.join(metrics_dir, filename), dpi=300, bbox_inches="tight")
     if show_plots:
         plt.show()
     else:
