@@ -49,8 +49,9 @@ from plots_giulia import (
 
 DATA_PATH = first_existing_path(
     [
-        os.path.join(REPO_ROOT, "datasets", "spectral_dataset_clean.parquet"),
+        os.path.join(WORKSPACE_ROOT, "PCA", "spectral_dataset.parquet"),
         os.path.join(REPO_ROOT, "datasets", "spectral_dataset.parquet"),
+        os.path.join(REPO_ROOT, "datasets", "spectral_dataset_clean.parquet"),
         os.path.join(WORKSPACE_ROOT, "PCA", "spectral_dataset_clean.parquet"),
     ]
 )
@@ -63,7 +64,7 @@ SAVE_FAIR_HISTORY = False
 #   "grid"   -> many lightweight runs, only comparison tables
 MODE = "single"
 
-EXPERIMENT_NAME = "s10_no_smooth"
+EXPERIMENT_NAME = "s10_smooth5_match_claudio"
 
 CLASS_1_NAME = "class_1"
 CLASS_0_NAME = "class_0"
@@ -79,10 +80,9 @@ N_FOLDS = 5
 GROUP_COLUMN = "Sample_ID"
 VALIDATION_SIZE_WITHIN_TRAIN = 0.1875
 
-N_COMPONENTS = 483
-PCA_RANDOM_STATE = 42
+N_COMPONENTS = 10
 
-MODEL_SIZE = "L"
+MODEL_SIZE = "S"
 EPOCHS = 100
 BATCH_SIZE = 8192
 CLASSIFICATION_THRESHOLD = 0.49
@@ -100,9 +100,10 @@ PREDICTION_SMOOTHING_METHOD = "mean"
 PREDICTION_SMOOTHING_KERNEL_SIZE = 5
 
 RANDOM_STATE = 43
+PCA_RANDOM_STATE = RANDOM_STATE
 
 SAVE_PCA_ARTIFACTS = False
-SAVE_PREDICTION_MAPS = True
+SAVE_PREDICTION_MAPS = False
 
 SAMPLE_RANKING_PRIMARY_METRIC = "class_1_f1"
 SAMPLE_RANKING_SECONDARY_METRIC = "class_1_recall"
@@ -251,8 +252,8 @@ def run_grid():
 
         for fold_number, (train_idx_unbalanced, val_idx, test_idx) in enumerate(folds, start=1):
             fold_seed = RANDOM_STATE + fold_number
-            set_seed(fold_seed)
             tf.keras.backend.clear_session()
+            set_seed(RANDOM_STATE)
 
             train_idx = balance_indices(y_all, train_idx_unbalanced, balance_classes=BALANCE_CLASSES, seed=fold_seed)
             y_train = y_all[train_idx]
@@ -487,8 +488,8 @@ def main():
         print("=" * 70)
 
         fold_seed = RANDOM_STATE + fold_number
-        set_seed(fold_seed)
         tf.keras.backend.clear_session()
+        set_seed(RANDOM_STATE)
 
         train_idx = balance_indices(y_all, train_idx_unbalanced, balance_classes=BALANCE_CLASSES, seed=fold_seed)
 
