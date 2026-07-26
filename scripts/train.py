@@ -25,8 +25,9 @@ import tensorflow as tf
 from collections import defaultdict
 from itertools import product
 from pathlib import Path
+from sklearn.metrics import f1_score
 from src import plots
-from src.pipeline import (balance_indices, evaluate_fold, make_folds,
+from src.pipeline import (Y_PROB_BIAS, balance_indices, evaluate_fold, make_folds,
                           prepare_fold, set_seed, summarize_metrics, train_model)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,10 +73,10 @@ df = pd.read_parquet(DATA_PATH, engine='pyarrow')
 band_cols = [c for c in df.columns if c.startswith('band_')]
 
 df = df[~df['Label'].isin(EXCLUDE_LABELS)].copy()
-df['y'] = df['Label'].isin(TUMOR_LABELS).astype(int)
+df['is_tumor'] = df['Label'].isin(TUMOR_LABELS).astype(int)
 
 X      = df[band_cols].to_numpy(dtype=np.float32)
-y      = df['y'].to_numpy()
+y      = df['is_tumor'].to_numpy()
 groups = df['Sample_ID'].to_numpy()
 del df; gc.collect()
 
@@ -100,7 +101,7 @@ all_summaries, all_folds = [], []
 
 folds   = make_folds(y, groups)
 n_folds = len(folds)
-acc     = defaultdict(lambda: {'hist': [], 'metrics': [], 'roc': []})
+acc     = defaultdict(lambda: {'hist': [], 'metrics': [], 'roc': [], 'sample_metrics': []})
 
 for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
     tr_idx = balance_indices(y, tr_idx)
@@ -126,6 +127,15 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
         store['hist'].append(history.history)
         store['metrics'].append(metrics)
         store['roc'].append((y_te, y_prob))
+
+        sample_ids_te = groups[te_idx]                # Sample_ID per test-set row
+        y_pred = (y_prob > Y_PROB_BIAS).astype(int)
+        for sid in np.unique(sample_ids_te):
+            mask = sample_ids_te == sid
+            f1_s = f1_score(y_te[mask], y_pred[mask], zero_division=0)
+            store['sample_metrics'].append({'sample_id': sid, 'fold': fi,
+                                            'n_pixels': int(mask.sum()), 'f1': f1_s})
+
         print(f"  AUC={metrics['auc']:.4f} acc={metrics['accuracy']:.4f} "
               f"recall={metrics['recall']:.4f} f1={metrics['f1']:.4f}")
 
@@ -143,11 +153,14 @@ for (architecture, n_pc), store in acc.items():
     print(f"\n=== {tag} === AUC {summary['auc_mean']:.4f} ± {summary['auc_std']:.4f} "
           f"| recall {summary['recall_mean']:.4f} | f1 {summary['f1_mean']:.4f}")
 
+    sample_df = pd.DataFrame(store['sample_metrics'])
+
     save_dir = None
     if SAVE_RESULTS:
         save_dir = results_dir / architecture / f'PC{n_pc}'
         save_dir.mkdir(parents=True, exist_ok=True)
         per_fold_df.to_csv(save_dir / 'fold_metrics.csv', index=False)
+        sample_df.to_csv(save_dir / 'sample_metrics.csv', index=False)
 
     def _p(name):                       # figure path or None
         return str(save_dir / name) if save_dir else None
@@ -162,6 +175,8 @@ for (architecture, n_pc), store in acc.items():
     if n_folds > 1:
         plots.plot_fold_auc(aucs, title=f'AUC per fold – {tag}',
                             save_path=_p('fold_auc.png'), show=SHOW_PLOTS)
+    plots.plot_sample_f1(sample_df['sample_id'], sample_df['f1'], title=f'F1 per sample – {tag}',
+                         save_path=_p('sample_f1.png'), show=SHOW_PLOTS)
 
 # ══════════════════════════════ SUMMARIES ═════════════════════════════════════
 

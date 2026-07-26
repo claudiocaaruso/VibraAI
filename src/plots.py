@@ -12,8 +12,10 @@ When several folds are supplied the curves/ROC are aggregated with a mean
 line and a ±1 std band; with a single fold the raw fold is shown.
 """
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from sklearn.metrics import auc as auc_score
 from sklearn.metrics import confusion_matrix, roc_curve
 
@@ -146,6 +148,31 @@ def plot_fold_auc(aucs, title='', save_path=None, show=False):
     _finish(fig, save_path, show)
 
 
+def plot_sample_f1(sample_ids, f1_scores, title='', save_path=None, show=False):
+    """Horizontal bar chart of F1 per Sample_ID, sorted ascending, mean as a dashed line.
+
+    Each sample is held out exactly once under 5-fold group-aware CV, so this
+    is a single F1 per sample (a post-hoc breakdown of each fold's test
+    predictions by Sample_ID), not a mean across folds. F1 (with
+    zero_division=0) is always defined, unlike AUC, which needs both classes
+    present in a sample's pixels — many samples here are single-class.
+    """
+    f1_scores = np.asarray(f1_scores, dtype=float)
+    order = np.argsort(f1_scores)
+    sample_ids = np.asarray(sample_ids)[order]
+    f1_scores = f1_scores[order]
+    y_pos = np.arange(len(f1_scores))
+
+    fig, ax = plt.subplots(figsize=(8, 0.35 * len(f1_scores) + 2))
+    ax.barh(y_pos, f1_scores, color='#4c72b0')
+    mean = np.nanmean(f1_scores)
+    ax.axvline(mean, color='r', ls='--', label=f'Mean = {mean:.3f}')
+    ax.set_yticks(y_pos); ax.set_yticklabels(sample_ids)
+    ax.set_xlabel('F1'); ax.set_xlim(0, 1)
+    ax.set_title(title or 'F1 per sample'); ax.legend()
+    _finish(fig, save_path, show)
+
+
 # ── grid-search comparison plots ────────────────────────────────────────────
 # These read the summary/fold tables written by scripts/train.py (MODE='grid')
 # rather than in-memory training state — see scripts/analyze_grid.py.
@@ -217,4 +244,47 @@ def plot_grid_complexity(summary_df, metric='auc', title='', save_path=None, sho
     ax.set_xlabel('Trainable parameters'); ax.set_ylabel(metric.upper())
     ax.set_title(title or f'{metric.upper()} vs model complexity')
     ax.legend(title='Architecture'); ax.grid(True, alpha=0.3)
+    _finish(fig, save_path, show)
+
+
+HEALTHY_TUMOR_CMAP = LinearSegmentedColormap.from_list('healthy_tumor', ['forestgreen', 'darkred'])
+
+
+def plot_prediction_map(x, y, y_true, y_prob, threshold, title='', save_path=None, show=False):
+    """True labels, predicted probability, and prediction errors for one Raman map.
+
+    Three panels sharing spatial (x, y) axes: true tumoral/healthy labels,
+    the predicted probability (already smoothed by the caller, if at all) on
+    the same green-to-red scale as the true labels for a direct visual
+    comparison, and a plain correct/error map from thresholding that
+    probability (no FP/FN distinction — just where predictions are wrong).
+    """
+    def grid(values):
+        return (pd.DataFrame({'x': x, 'y': y, 'v': values})
+                  .pivot_table(index='y', columns='x', values='v')
+                  .sort_index().sort_index(axis=1))
+
+    y_pred = (np.asarray(y_prob) > threshold).astype(int)
+    is_error = (y_pred != np.asarray(y_true)).astype(int)
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    axes[0].imshow(grid(y_true), cmap=HEALTHY_TUMOR_CMAP, vmin=0, vmax=1, origin='lower')
+    axes[0].set_title('True labels')
+
+    im = axes[1].imshow(grid(y_prob), cmap=HEALTHY_TUMOR_CMAP, vmin=0, vmax=1, origin='lower')
+    axes[1].set_title('Predicted probability')
+    fig.colorbar(im, ax=axes[1], fraction=0.046)
+
+    im2 = axes[2].imshow(grid(is_error), cmap=ListedColormap(['white', 'red']),
+                         vmin=0, vmax=1, origin='lower')
+    cbar = fig.colorbar(im2, ax=axes[2], ticks=[0, 1], fraction=0.046)
+    cbar.ax.set_yticklabels(['Correct', 'Error'])
+    axes[2].set_title('Prediction errors')
+
+    for ax in axes:
+        ax.set_xlabel('x'); ax.set_ylabel('y')
+
+    if title:
+        fig.suptitle(title)
     _finish(fig, save_path, show)

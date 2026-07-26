@@ -75,7 +75,7 @@ def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, seed=43):
 
 # ── leakage-safe splitting ────────────────────────────────────────────────────
 
-def make_folds(y, groups, cv=5, val_frac=0.1875, seed=43):
+def make_folds(y, groups, cv=5, val_frac=0.15, seed=43):
     """Generate a list of (train_idx, val_idx, test_idx) tuples via group-aware
     stratified k-fold CV.
 
