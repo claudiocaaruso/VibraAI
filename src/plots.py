@@ -17,6 +17,8 @@ import seaborn as sns
 from sklearn.metrics import auc as auc_score
 from sklearn.metrics import confusion_matrix, roc_curve
 
+from src.model import count_params
+
 plt.rcParams.update(
     {
         "font.family": "serif",
@@ -46,12 +48,17 @@ def _finish(fig, save_path, show):
         plt.close(fig)
 
 
+_CURVE_YLIMS = {'loss': (0.35, 0.75), 'accuracy': (0.5, 1.0), 'auc': (0.5, 1.0)}
+
+
 def plot_training_curves(histories, title='', save_path=None, show=False):
     """Loss / Accuracy / AUC over epochs, train vs validation.
 
     `histories` is a list of `history.history` dicts (one per fold). With more
     than one fold the mean ±1 std across folds is drawn; folds are truncated to
-    the shortest length (early stopping gives unequal epoch counts).
+    the shortest length (early stopping gives unequal epoch counts). Y-axis
+    ranges are fixed (see `_CURVE_YLIMS`) rather than auto-scaled, so curves
+    are visually comparable across different runs/figures.
     """
     min_len = min(len(h['loss']) for h in histories)
     epochs  = np.arange(1, min_len + 1)
@@ -69,6 +76,7 @@ def plot_training_curves(histories, title='', save_path=None, show=False):
                 std = arr.std(axis=0)
                 ax.fill_between(epochs, mean - std, mean + std, color=color, alpha=0.2)
         ax.set_title(label); ax.set_xlabel('Epoch'); ax.set_ylabel(label)
+        ax.set_ylim(*_CURVE_YLIMS[key])
         ax.legend(); ax.grid(True, alpha=0.3)
 
     if title:
@@ -135,4 +143,78 @@ def plot_fold_auc(aucs, title='', save_path=None, show=False):
     ax.axhline(mean, color='r', ls='--', label=f'Mean = {mean:.3f}')
     ax.set_xlabel('Fold'); ax.set_ylabel('AUC'); ax.set_xticks(folds)
     ax.set_ylim(0, 1); ax.set_title(title or 'AUC per fold'); ax.legend()
+    _finish(fig, save_path, show)
+
+
+# ── grid-search comparison plots ────────────────────────────────────────────
+# These read the summary/fold tables written by scripts/train.py (MODE='grid')
+# rather than in-memory training state — see scripts/analyze_grid.py.
+
+def plot_grid_heatmap(summary_df, metric='auc_mean', title='', save_path=None, show=False):
+    """Heatmap of a summary metric across architecture x n_pc combinations."""
+    pivot = summary_df.pivot(index='architecture', columns='n_pc', values=metric)
+    fig, ax = plt.subplots(figsize=(1.2 * len(pivot.columns) + 2, 3))
+    sns.heatmap(pivot, annot=True, fmt='.3f', cmap='viridis', ax=ax)
+    ax.set_xlabel('PCA components'); ax.set_ylabel('Architecture')
+    ax.set_title(title or metric)
+    _finish(fig, save_path, show)
+
+
+def plot_grid_lines(summary_df, metric='auc', title='', save_path=None, show=False):
+    """Mean ± std of a metric vs n_pc, one line per architecture."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for architecture, group in summary_df.groupby('architecture'):
+        group = group.sort_values('n_pc')
+        n_pc  = group['n_pc'].to_numpy()
+        mean  = group[f'{metric}_mean'].to_numpy()
+        std   = group[f'{metric}_std'].to_numpy()
+        ax.plot(n_pc, mean, marker='o', label=architecture)
+        ax.fill_between(n_pc, mean - std, mean + std, alpha=0.15)
+    ax.set_xlabel('PCA components'); ax.set_ylabel(metric.upper())
+    ax.set_title(title or f'{metric.upper()} vs PCA components')
+    ax.legend(title='Architecture'); ax.grid(True, alpha=0.3)
+    _finish(fig, save_path, show)
+
+
+def plot_grid_leaderboard(summary_df, metric='auc', top_n=10, title='', save_path=None, show=False):
+    """Horizontal bar chart of the top-N combinations ranked by a summary metric."""
+    top = summary_df.nlargest(top_n, f'{metric}_mean')
+    labels = [f'{row.architecture}_PC{row.n_pc}' for row in top.itertuples()]
+    y_pos  = np.arange(len(top))
+
+    fig, ax = plt.subplots(figsize=(8, 0.4 * len(top) + 2))
+    ax.barh(y_pos, top[f'{metric}_mean'], xerr=top[f'{metric}_std'], color='#4c72b0')
+    ax.set_yticks(y_pos); ax.set_yticklabels(labels)
+    ax.invert_yaxis()
+    ax.set_xlabel(metric.upper())
+    ax.set_title(title or f'Top {top_n} by {metric.upper()}')
+    _finish(fig, save_path, show)
+
+
+def plot_grid_boxplot(folds_df, combos, metric='auc', title='', save_path=None, show=False):
+    """Per-fold distribution of a metric for a chosen list of (architecture, n_pc) combos."""
+    mask = np.zeros(len(folds_df), dtype=bool)
+    for architecture, n_pc in combos:
+        mask |= (folds_df['architecture'] == architecture) & (folds_df['n_pc'] == n_pc)
+    subset = folds_df[mask].copy()
+    subset['combo'] = subset['architecture'] + '_PC' + subset['n_pc'].astype(str)
+
+    fig, ax = plt.subplots(figsize=(1.5 * len(combos) + 2, 5))
+    sns.boxplot(data=subset, x='combo', y=metric, ax=ax, color='#4c72b0')
+    sns.stripplot(data=subset, x='combo', y=metric, ax=ax, color='black', alpha=0.6)
+    ax.set_xlabel('Combination'); ax.set_ylabel(metric.upper())
+    ax.set_title(title or f'Per-fold {metric.upper()} — top combinations')
+    _finish(fig, save_path, show)
+
+
+def plot_grid_complexity(summary_df, metric='auc', title='', save_path=None, show=False):
+    """Trainable-parameter count vs a summary metric, colored by architecture."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+    for architecture, group in summary_df.groupby('architecture'):
+        params = [count_params(architecture, n) for n in group['n_pc']]
+        ax.errorbar(params, group[f'{metric}_mean'], yerr=group[f'{metric}_std'],
+                    fmt='o', label=architecture)
+    ax.set_xlabel('Trainable parameters'); ax.set_ylabel(metric.upper())
+    ax.set_title(title or f'{metric.upper()} vs model complexity')
+    ax.legend(title='Architecture'); ax.grid(True, alpha=0.3)
     _finish(fig, save_path, show)

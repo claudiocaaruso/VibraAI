@@ -1,6 +1,17 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.layers import Dense
+
+# Hidden-layer widths per architecture. Kept in sync with `ann_classification`
+# below so `count_params` can compute trainable-parameter counts analytically,
+# without building a model — used for grid-search complexity-vs-performance plots.
+ARCHITECTURE_LAYERS = {'S': [16, 8], 'M': [64, 32], 'L': [128, 64, 16]}
+
+
+def count_params(size, num_components):
+    """Trainable-parameter count for `ann_classification(num_components, size)`."""
+    sizes = [num_components] + ARCHITECTURE_LAYERS[size] + [1]
+    return sum((a + 1) * b for a, b in zip(sizes, sizes[1:]))
 
 
 def ann_classification(num_components, size):
@@ -18,21 +29,14 @@ def ann_classification(num_components, size):
 
     if size == 'S':
         model.add(Dense(16, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.2))
         model.add(Dense(8,  activation='relu'))
-        # model.add(Dropout(rate=0.4))
     elif size == 'M':
         model.add(Dense(64, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.2))
         model.add(Dense(32, activation='relu'))
-        model.add(Dropout(rate=0.2))
     elif size == 'L':
         model.add(Dense(128, activation='relu', input_shape=(num_components,)))
-        model.add(Dropout(rate=0.2))
         model.add(Dense(64,  activation='relu'))
-        model.add(Dropout(rate=0.2))
         model.add(Dense(16,  activation='relu'))
-        model.add(Dropout(rate=0.2))
     else:
         raise ValueError("size must be 'S', 'M', or 'L'")
 
