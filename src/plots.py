@@ -40,8 +40,10 @@ plt.rcParams.update(
 CLASS_NAMES = ['Healthy', 'Tumoral']
 Y_PROB_BIAS = 0.49
 
-def _finish(fig, save_path, show):
+def _finish(fig, save_path, show, wspace=None):
     fig.tight_layout()
+    if wspace is not None:          # applied after tight_layout, which would otherwise undo it
+        fig.subplots_adjust(wspace=wspace)
     if save_path is not None:
         fig.savefig(save_path, dpi=200, bbox_inches='tight')
     if show:
@@ -50,24 +52,26 @@ def _finish(fig, save_path, show):
         plt.close(fig)
 
 
-_CURVE_YLIMS = {'loss': (0.35, 0.75), 'accuracy': (0.5, 1.0), 'auc': (0.5, 1.0)}
+_CURVE_YLIMS = {'loss': (0.35, 0.75), 'auc': (0.5, 1.0)}
 
 
 def plot_training_curves(histories, title='', save_path=None, show=False):
-    """Loss / Accuracy / AUC over epochs, train vs validation.
+    """Loss / AUC over epochs, train vs validation.
 
-    `histories` is a list of `history.history` dicts (one per fold). With more
-    than one fold the mean ±1 std across folds is drawn; folds are truncated to
-    the shortest length (early stopping gives unequal epoch counts). Y-axis
-    ranges are fixed (see `_CURVE_YLIMS`) rather than auto-scaled, so curves
-    are visually comparable across different runs/figures.
+    `histories` is a list of `history.history` dicts (one per fold). With
+    more than one fold the mean ±1 std across folds is drawn; folds are
+    truncated to the shortest length (early stopping gives unequal epoch
+    counts). Y-axis ranges are fixed (see `_CURVE_YLIMS`) rather than
+    auto-scaled, so curves are visually comparable across different
+    runs/figures. No per-panel y-labels — the panel title already names the
+    metric.
     """
     min_len = min(len(h['loss']) for h in histories)
     epochs  = np.arange(1, min_len + 1)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    for ax, key, label in zip(axes, ['loss', 'accuracy', 'auc'],
-                              ['Loss (BCE)', 'Accuracy', 'AUC']):
+    for ax, key, label in zip(axes, ['loss', 'auc'],
+                              ['Loss (BCE)', 'AUC']):
         for prefix, name, color in [('', 'Train', '#1f77b4'),
                                     ('val_', 'Validation', '#ff7f0e')]:
             arr  = np.array([h[f'{prefix}{key}'][:min_len] for h in histories])
@@ -77,13 +81,18 @@ def plot_training_curves(histories, title='', save_path=None, show=False):
             if len(histories) > 1:
                 std = arr.std(axis=0)
                 ax.fill_between(epochs, mean - std, mean + std, color=color, alpha=0.2)
-        ax.set_title(label); ax.set_xlabel('Epoch'); ax.set_ylabel(label)
+        ax.set_title(label, fontsize=18)
+        ax.set_xlabel('Epochs', fontsize=18)
         ax.set_ylim(*_CURVE_YLIMS[key])
-        ax.legend(); ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='both', labelsize=18)
+        ax.legend(fontsize=18); ax.grid(True, alpha=0.3)
 
     if title:
-        fig.suptitle(title)
-    _finish(fig, save_path, show)
+        fig.suptitle(title, fontsize=18)
+    _finish(fig, save_path, show, wspace=0.4)
+
+
+_ROC_CM_FIGSIZE = (7, 7)   # shared by plot_roc/plot_confusion so the two line up in LaTeX
 
 
 def plot_roc(roc_data, title='', save_path=None, show=False):
@@ -93,7 +102,7 @@ def plot_roc(roc_data, title='', save_path=None, show=False):
     """
     mean_fpr = np.linspace(0, 1, 200)
     tprs, aucs = [], []
-    fig, ax = plt.subplots(figsize=(7, 6))
+    fig, ax = plt.subplots(figsize=_ROC_CM_FIGSIZE)
 
     for i, (y_true, y_prob) in enumerate(roc_data, start=1):
         fpr, tpr, _ = roc_curve(y_true, y_prob)
@@ -115,8 +124,12 @@ def plot_roc(roc_data, title='', save_path=None, show=False):
                         label='± 1 std')
 
     ax.plot([0, 1], [0, 1], ls='--', color='gray', lw=1)
-    ax.set_xlabel('False Positive Rate'); ax.set_ylabel('True Positive Rate')
-    ax.set_title(title or 'ROC'); ax.legend(loc='lower right')
+    ax.set_xlabel('False Positive Rate', fontsize=18)
+    ax.set_ylabel('True Positive Rate', fontsize=18)
+    ax.set_title(title or 'ROC', fontsize=18)
+    ax.tick_params(axis='both', labelsize=18)
+    ax.legend(loc='lower right', fontsize=18)
+    ax.set_aspect('equal', adjustable='box')
     _finish(fig, save_path, show)
 
 
@@ -127,11 +140,14 @@ def plot_confusion(roc_data, title='', save_path=None, show=False):
         total += confusion_matrix(y_true, (y_prob > Y_PROB_BIAS).astype(int), labels=[0, 1])
     cm = total / total.sum(axis=1, keepdims=True)
 
-    fig, ax = plt.subplots(figsize=(6, 5))
-    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', ax=ax,
-                xticklabels=CLASS_NAMES, yticklabels=CLASS_NAMES)
-    ax.set_xlabel('Predicted'); ax.set_ylabel('True')
-    ax.set_title(title or 'Confusion Matrix')
+    fig, ax = plt.subplots(figsize=_ROC_CM_FIGSIZE)
+    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', ax=ax, cbar=False, square=True,
+                xticklabels=CLASS_NAMES, yticklabels=CLASS_NAMES,
+                annot_kws={'size': 18})
+    ax.set_xlabel('Predicted', fontsize=18)
+    ax.set_ylabel('True', fontsize=18)
+    ax.set_title(title or 'Confusion Matrix', fontsize=18)
+    ax.tick_params(axis='both', labelsize=18)
     _finish(fig, save_path, show)
 
 

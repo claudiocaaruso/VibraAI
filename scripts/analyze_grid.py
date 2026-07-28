@@ -13,7 +13,7 @@ from src import plots
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-GRID_DIR = ROOT / 'results' / 'grid'
+GRID_DIR = ROOT / 'results' / 'grid_tumor_stroma'
 METRIC   = 'auc'        # metric driving ranking / leaderboard / complexity plots
 TOP_N    = 5             # combinations shown in the leaderboard and boxplot
 
@@ -27,7 +27,7 @@ print(summary_df.nlargest(TOP_N, f'{METRIC}_mean')
       .to_string(index=False))
 
 plots.plot_grid_heatmap(summary_df, metric=f'{METRIC}_mean',
-                        title=f'Mean {METRIC.upper()} across the grid',
+                        title=f'Mean {METRIC.upper()} for tumor/tumor stroma classification',
                         save_path=str(GRID_DIR / f'heatmap_{METRIC}.png'))
 
 plots.plot_grid_lines(summary_df, metric=METRIC,

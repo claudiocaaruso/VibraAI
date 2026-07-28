@@ -29,15 +29,20 @@ from src.pipeline import (Y_PROB_BIAS, balance_indices, make_folds,
 DATA_PATH = ROOT / 'datasets' / 'spectral_dataset.parquet'
 
 TUMOR_LABELS   = [2, 20]
-EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]
-# EXCLUDE_LABELS = [-1, 15]
+PROBLEM_TYPE   = 'macro-class'  # single-class or macro-class
+SEED           = 43             # controls every stochastic step (splits, balancing, PCA, model init)
 ARCHITECTURE   = 'S'
 N_PC           = 10
 BATCH_SIZE     = 4096
-KERNEL_SIZE    = 3              # w x w mean filter; 1 = off (raw, no smoothing)
-SAMPLE_ID      = None           # e.g. '2787_024' to only plot that sample's maps; None = plot all
+KERNEL_SIZE    = 15             # w x w mean filter; 1 = off (raw, no smoothing)
+SAMPLE_ID      = 2787_024           # e.g. '2787_024' to only plot that sample's maps; None = plot all
 
-set_seed(43)
+set_seed(SEED)
+
+if PROBLEM_TYPE == 'single-class':
+    EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
+else:
+    EXCLUDE_LABELS = [-1, 15]
 
 print("Loading spectral dataset …")
 df = pd.read_parquet(DATA_PATH, engine='pyarrow')
@@ -50,9 +55,16 @@ y      = df['is_tumor'].to_numpy()
 groups = df['Sample_ID'].to_numpy()
 meta   = df[['Sample_ID', 'Map_ID', 'x', 'y']]
 
-folds   = make_folds(y, groups)
+folds   = make_folds(y, groups, seed=SEED)
 n_folds = len(folds)
 label   = 'raw' if KERNEL_SIZE == 1 else f'{KERNEL_SIZE}x{KERNEL_SIZE} smoothing'
+
+kernel_dir = 'raw' if KERNEL_SIZE == 1 else f'kernel{KERNEL_SIZE}'
+save_dir = ROOT / 'results' / 'compare_smoothing' / f'{ARCHITECTURE}_PC{N_PC}' / kernel_dir
+save_dir.mkdir(parents=True, exist_ok=True)
+
+def _p(name):                       # figure path, saved under save_dir
+    return str(save_dir / name)
 
 
 def metrics_at(y_true, y_prob):
@@ -62,6 +74,7 @@ def metrics_at(y_true, y_prob):
         'auc':       roc_auc_score(y_true, y_prob),
         'precision': precision_score(y_true, y_pred, zero_division=0),
         'recall':    recall_score(y_true, y_pred, zero_division=0),
+        'tnr':       recall_score(y_true, y_pred, pos_label=0, zero_division=0),
         'f1':        f1_score(y_true, y_pred, zero_division=0),
     }
 
@@ -73,14 +86,14 @@ smoothed_per_fold = []   # (y_te, y_prob, df_te) per fold, already smoothed
 
 for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
     print(f"\n{'#'*64}\n  fold {fi}/{n_folds} | {ARCHITECTURE}/PC{N_PC}\n{'#'*64}")
-    tr_idx = balance_indices(y, tr_idx)
+    tr_idx = balance_indices(y, tr_idx, seed=SEED)
 
-    X_tr, X_val, X_te = prepare_fold(X, tr_idx, val_idx, te_idx, N_PC)
+    X_tr, X_val, X_te = prepare_fold(X, tr_idx, val_idx, te_idx, N_PC, seed=SEED)
     y_tr, y_val, y_te = y[tr_idx], y[val_idx], y[te_idx]
     df_te = meta.iloc[te_idx].reset_index(drop=True)
 
     tf.keras.backend.clear_session()
-    set_seed(43)
+    set_seed(SEED)
     model, history = train_model(X_tr, y_tr, X_val, y_val, ARCHITECTURE, batch_size=BATCH_SIZE)
     y_prob_raw = model.predict(X_te, verbose=0).flatten()
     y_prob = smooth_probabilities(df_te, y_prob_raw, KERNEL_SIZE)
@@ -88,8 +101,9 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
     hist_per_fold.append(history.history)
     smoothed_per_fold.append((y_te, y_prob, df_te))
 
-plots.plot_training_curves(hist_per_fold, title=f'Training curves – {ARCHITECTURE}_PC{N_PC}',
-                           show=True)
+plots.plot_training_curves(hist_per_fold,
+                           title=f'{PROBLEM_TYPE} problem with {ARCHITECTURE} model and {N_PC} PCs',
+                           save_path=_p('training_curves.png'), show=True)
 
 # ── pool predictions across folds: metrics, ROC, confusion ────────────────────
 
@@ -99,10 +113,10 @@ fold_metrics = [metrics_at(y_te, y_prob) for y_te, y_prob, _ in smoothed_per_fol
 _, summary = summarize_metrics(fold_metrics)
 print(f"\n=== {label} === AUC {summary['auc_mean']:.4f} ± {summary['auc_std']:.4f} "
       f"| acc {summary['accuracy_mean']:.4f} | recall {summary['recall_mean']:.4f} "
-      f"| f1 {summary['f1_mean']:.4f}")
+      f"| tnr {summary['tnr_mean']:.4f} | f1 {summary['f1_mean']:.4f}")
 
-plots.plot_roc(roc_data, title=f'ROC – {label}', show=True)
-plots.plot_confusion(roc_data, title=f'Confusion – {label}', show=True)
+plots.plot_roc(roc_data, title=f'ROC – {label}', save_path=_p('roc.png'), show=True)
+plots.plot_confusion(roc_data, title=f'Confusion – {label}', save_path=_p('confusion.png'), show=True)
 
 # ── true labels / predicted probability / error map, per Raman map ───────────
 
@@ -113,5 +127,6 @@ for y_te, y_prob, df_te in smoothed_per_fold:
         pos = map_rows.index.to_numpy()   # positional, since df_te's index was reset
         plots.plot_prediction_map(
             map_rows['x'], map_rows['y'], y_te[pos], y_prob[pos], Y_PROB_BIAS,
-            title=f'Sample {sample_id} / {map_id} – {label}', show=True,
+            title=f'Sample {sample_id} / {map_id} – {label}',
+            save_path=_p(f'map_{sample_id}_{map_id}.png'), show=True,
         )

@@ -35,19 +35,18 @@ sys.path.insert(0, str(ROOT))
 
 DATA_PATH = ROOT / 'datasets' / 'spectral_dataset.parquet'
 
-# ══════════════════════════════ CONFIG ════════════════════════════════════════
+# ═════════════════════════════ CONFIG ════════════════════════════════════════
 
-MODE = 'grid'                 # 'single' or 'grid'
+MODE = 'single'                 # 'single' or 'grid'
+SEED = 43                       # controls every stochastic step (splits, balancing, PCA, model init)
 
 # --- dataset & labels (fully configurable) ---
 TUMOR_LABELS   = [2,20]     # mapped to the positive class (1 = Tumoral)
-# EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
-EXCLUDE_LABELS = [-1, 15]
+PROBLEM_TYPE = 'Single-class'       # Single-class or Macro-class (FIRST LETTER IN UPPERCASE)
 
 # --- single-mode configuration ---
 ARCHITECTURE = 'S'              # 'S' | 'M' | 'L'
-N_PC         = 10               # number of PCA components
-
+N_PC         = 10
 # --- grid-mode variants ---
 ARCHITECTURE_VARIANTS = ['S', 'M', 'L']
 PC_VARIANTS           = [1, 2, 3, 5, 10, 20, 30, 50, 100, 150, 200, 300, 400, 483]
@@ -56,15 +55,20 @@ PC_VARIANTS           = [1, 2, 3, 5, 10, 20, 30, 50, 100, 150, 200, 300, 400, 48
 BATCH_SIZE = int(4096)
 
 # --- output ---
-SAVE_RESULTS = True # single mode: set True to also persist outputs
-SHOW_PLOTS   = False
+SAVE_RESULTS = False # single mode: set True to also persist outputs
+SHOW_PLOTS   = True
 
 # ═══════════════════════════ APPLY CONFIG ═════════════════════════════════════
 
 if not SHOW_PLOTS:
     plt.switch_backend('Agg')     # headless: figures are saved, never displayed
 
-set_seed(43)
+set_seed(SEED)
+
+if PROBLEM_TYPE == 'Single-class':
+    EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
+else:
+    EXCLUDE_LABELS = [-1, 15]
 
 # ══════════════════════════════ LOAD DATA ═════════════════════════════════════
 
@@ -99,21 +103,21 @@ all_summaries, all_folds = [], []
 # loops reuse it via slicing. Per-fold model results are accumulated per
 # (architecture, n_pc) and aggregated after all folds.
 
-folds   = make_folds(y, groups)
+folds   = make_folds(y, groups, seed=SEED)
 n_folds = len(folds)
 acc     = defaultdict(lambda: {'hist': [], 'metrics': [], 'roc': [], 'sample_metrics': []})
 
 for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
-    tr_idx = balance_indices(y, tr_idx)
+    tr_idx = balance_indices(y, tr_idx, seed=SEED)
 
-    X_tr, X_val, X_te = prepare_fold(X, tr_idx, val_idx, te_idx, max_pc)
+    X_tr, X_val, X_te = prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, seed=SEED)
     y_tr, y_val, y_te = y[tr_idx], y[val_idx], y[te_idx]
 
     for architecture, n_pc in product(architecture_list, pc_list):
         print(f"\n{'#'*64}\n  fold {fi}/{n_folds} "
               f"| architecture={architecture} n_pc={n_pc}\n{'#'*64}")
         tf.keras.backend.clear_session()
-        set_seed(43)
+        set_seed(SEED)
         model, history = train_model(
             X_tr[:, :n_pc], y_tr, X_val[:, :n_pc], y_val, architecture,
             verbose=1 if MODE == 'single' else 0,
@@ -137,7 +141,7 @@ for fi, (tr_idx, val_idx, te_idx) in enumerate(folds, start=1):
                                             'n_pixels': int(mask.sum()), 'f1': f1_s})
 
         print(f"  AUC={metrics['auc']:.4f} acc={metrics['accuracy']:.4f} "
-              f"recall={metrics['recall']:.4f} f1={metrics['f1']:.4f}")
+              f"recall={metrics['recall']:.4f} tnr={metrics['tnr']:.4f} f1={metrics['f1']:.4f}")
 
     del X_tr, X_val, X_te; gc.collect()
 
@@ -151,7 +155,8 @@ for (architecture, n_pc), store in acc.items():
 
     tag = f"{architecture}_PC{n_pc}"
     print(f"\n=== {tag} === AUC {summary['auc_mean']:.4f} ± {summary['auc_std']:.4f} "
-          f"| recall {summary['recall_mean']:.4f} | f1 {summary['f1_mean']:.4f}")
+          f"| recall {summary['recall_mean']:.4f} | tnr {summary['tnr_mean']:.4f} "
+          f"| f1 {summary['f1_mean']:.4f}")
 
     sample_df = pd.DataFrame(store['sample_metrics'])
 
@@ -166,16 +171,17 @@ for (architecture, n_pc), store in acc.items():
         return str(save_dir / name) if save_dir else None
 
     aucs = [m['auc'] for m in store['metrics']]
-    plots.plot_training_curves(store['hist'], title=f'Training curves – {tag}',
+    config_desc = f'{PROBLEM_TYPE} problem with {architecture} model and {n_pc} PCs'
+    plots.plot_training_curves(store['hist'], title=config_desc,
                                save_path=_p('training_curves.png'), show=SHOW_PLOTS)
-    plots.plot_roc(store['roc'], title=f'ROC – {tag}',
+    plots.plot_roc(store['roc'], title=f'ROC – {config_desc}',
                    save_path=_p('roc.png'), show=SHOW_PLOTS)
-    plots.plot_confusion(store['roc'], title=f'Confusion – {tag}',
+    plots.plot_confusion(store['roc'], title=f'Confusion – {config_desc}',
                          save_path=_p('confusion.png'), show=SHOW_PLOTS)
     if n_folds > 1:
-        plots.plot_fold_auc(aucs, title=f'AUC per fold – {tag}',
+        plots.plot_fold_auc(aucs, title=f'AUC per fold – {config_desc}',
                             save_path=_p('fold_auc.png'), show=SHOW_PLOTS)
-    plots.plot_sample_f1(sample_df['sample_id'], sample_df['f1'], title=f'F1 per sample – {tag}',
+    plots.plot_sample_f1(sample_df['sample_id'], sample_df['f1'], title=f'F1 per sample – {config_desc}',
                          save_path=_p('sample_f1.png'), show=SHOW_PLOTS)
 
 # ══════════════════════════════ SUMMARIES ═════════════════════════════════════

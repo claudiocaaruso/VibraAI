@@ -43,7 +43,7 @@ def snv(X):
     return (X - mu) / sd
 
 
-def balance_indices(y, idx, cap=500000, seed=43):
+def balance_indices(y, idx, cap=500000, seed=42):
     """Downsample every class within `idx` to the size of the minority class.
 
     Returns a shuffled subset of `idx`. Applied to TRAINING indices only so
@@ -60,7 +60,7 @@ def balance_indices(y, idx, cap=500000, seed=43):
     return keep
 
 
-def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, seed=43):
+def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, seed=42):
     """SNV, then PCA fitted on the TRAINING split only.
 
     Returns the train/val/test matrices projected onto `max_pc` components.
@@ -75,7 +75,7 @@ def prepare_fold(X, tr_idx, val_idx, te_idx, max_pc, seed=43):
 
 # ── leakage-safe splitting ────────────────────────────────────────────────────
 
-def make_folds(y, groups, cv=5, val_frac=0.15, seed=43):
+def make_folds(y, groups, cv=5, val_frac=0.15, seed=42):
     """Generate a list of (train_idx, val_idx, test_idx) tuples via group-aware
     stratified k-fold CV.
 
@@ -142,15 +142,17 @@ def smooth_probabilities(df_te, y_prob, kernel_size):
     return smoothed
 
 
-METRIC_NAMES = ['accuracy', 'auc', 'precision', 'recall', 'f1']
+METRIC_NAMES = ['accuracy', 'auc', 'precision', 'recall', 'tnr', 'f1']
 
 
 def evaluate_fold(model, X_te, y_te):
     """Predict on the test split and return (metrics_dict, y_prob).
 
     Precision / recall / F1 are reported for the positive (Tumoral) class.
-    To evaluate with spatial smoothing instead, smooth the `y_prob` this
-    returns via `smooth_probabilities` and recompute the metrics yourself.
+    TNR (true negative rate / specificity) is recall of the negative
+    (Healthy) class. To evaluate with spatial smoothing instead, smooth the
+    `y_prob` this returns via `smooth_probabilities` and recompute the
+    metrics yourself.
     """
     y_prob = model.predict(X_te, verbose=0).flatten()
     y_pred = (y_prob > Y_PROB_BIAS).astype(int)
@@ -163,6 +165,7 @@ def evaluate_fold(model, X_te, y_te):
         'auc':       auc,
         'precision': precision_score(y_te, y_pred, zero_division=0),
         'recall':    recall_score(y_te, y_pred, zero_division=0),
+        'tnr':       recall_score(y_te, y_pred, pos_label=0, zero_division=0),
         'f1':        f1_score(y_te, y_pred, zero_division=0),
     }
     return metrics, y_prob
