@@ -49,7 +49,7 @@ print(f"X shape: {X.shape}")
 X = (X - X.mean(axis=1, keepdims=True)) / X.std(axis=1, keepdims=True)
 
 # %% --- per-label average spectra on SNV data (needed for reconstruction comparison) ---
-explained_var = 0.90
+explained_var = 0.71
 
 y           = df['Label'].values
 labels      = np.unique(y)

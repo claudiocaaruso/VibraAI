@@ -29,20 +29,20 @@ from src.pipeline import (Y_PROB_BIAS, balance_indices, make_folds,
 DATA_PATH = ROOT / 'datasets' / 'spectral_dataset.parquet'
 
 TUMOR_LABELS   = [2, 20]
-PROBLEM_TYPE   = 'macro-class'  # single-class or macro-class
+PROBLEM_TYPE   = 'Single-class'  # single-class or macro-class
 SEED           = 43             # controls every stochastic step (splits, balancing, PCA, model init)
 ARCHITECTURE   = 'S'
 N_PC           = 10
 BATCH_SIZE     = 4096
-KERNEL_SIZE    = 15             # w x w mean filter; 1 = off (raw, no smoothing)
-SAMPLE_ID      = 2787_024           # e.g. '2787_024' to only plot that sample's maps; None = plot all
+KERNEL_SIZE    = 7             # w x w mean filter; 1 = off (raw, no smoothing)
+SAMPLE_ID      = '3525_028'         # e.g. '2787_024' to only plot that sample's maps; None = plot all
 
 set_seed(SEED)
 
-if PROBLEM_TYPE == 'single-class':
+if PROBLEM_TYPE == 'Single-class':
     EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
 else:
-    EXCLUDE_LABELS = [-1, 15]
+    EXCLUDE_LABELS = [-1, 15, 0]
 
 print("Loading spectral dataset …")
 df = pd.read_parquet(DATA_PATH, engine='pyarrow')
@@ -127,6 +127,5 @@ for y_te, y_prob, df_te in smoothed_per_fold:
         pos = map_rows.index.to_numpy()   # positional, since df_te's index was reset
         plots.plot_prediction_map(
             map_rows['x'], map_rows['y'], y_te[pos], y_prob[pos], Y_PROB_BIAS,
-            title=f'Sample {sample_id} / {map_id} – {label}',
             save_path=_p(f'map_{sample_id}_{map_id}.png'), show=True,
         )

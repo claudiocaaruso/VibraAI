@@ -47,20 +47,6 @@ plt.title(f"Spectrum – Sample {row['Sample_ID']} at ({row['x']}, {row['y']}), 
 plt.xlabel("Band Index"); plt.ylabel("Intensity"); plt.grid(True)
 plt.show()
 
-# %% --- spatial heatmap for one band ---
-
-target_band = 'band_341'
-sample_id   = df['Sample_ID'].unique()[2]
-sample_data = df[df['Sample_ID'] == sample_id]
-heatmap_data = sample_data.pivot_table(index='y', columns='x', values=target_band)
-
-plt.figure(figsize=(8, 6))
-plt.imshow(heatmap_data, cmap='viridis', origin='lower')
-plt.colorbar(label='Intensity')
-plt.title(f"Map of {target_band} – Sample {sample_id}")
-plt.xlabel("x"); plt.ylabel("y")
-plt.tight_layout(); plt.show()
-
 # %% --- per-label average spectra ---
 
 unique_labels = df['Label'].unique()
@@ -134,10 +120,8 @@ plt.tight_layout()
 plt.show()
 
 # %% --- tumoral / healthy / discarded spatial maps ---
-sample_IDs = np.append(df['Sample_ID'].unique(), None)
 TUMOR_LABELS    = [2, 20]     # pixels treated as tumoral
 DISCARD_LABELS  = [-1, 15]       # pixels discarded; everything else is healthy
-SELECTED_SAMPLE = sample_IDs[10]           # a Sample_ID to plot just one, or [-1] to loop over all
 
 # 0 = discarded, 1 = healthy, 2 = tumoral
 cmap = ListedColormap(['white', 'forestgreen', 'darkred'])
@@ -152,8 +136,8 @@ def categorize(label):
     return 1
 
 
-def plot_category_map(sample_id):
-    sub = df[df['Sample_ID'] == sample_id].copy()
+def plot_category_map(sample_id, map_id, sub):
+    sub = sub.copy()
     sub['cat'] = sub['Label'].apply(categorize)
     grid = sub.pivot_table(index='y', columns='x', values='cat', aggfunc='first')
 
@@ -164,19 +148,15 @@ def plot_category_map(sample_id):
     plt.tight_layout(); plt.show()
 
 
-if SELECTED_SAMPLE is not None:
-    plot_category_map(SELECTED_SAMPLE)
-else:
-    for sid in df['Sample_ID'].unique():
-        plot_category_map(sid)
+for (sample_id, map_id), sub in df.groupby(['Sample_ID', 'Map_ID']):
+    plot_category_map(sample_id, map_id, sub)
 
 # %% --- tumoral macroclass vs single other class spatial maps ---
 
 # Pick the tumoral macroclass and a single other class to contrast against it.
 TUMOR_MACRO     = [2,20]     # pixels treated as tumoral
-OTHER_CLASS     = 4              # the single class to distinguish from tumoral
+OTHER_CLASS     = 6              # the single class to distinguish from tumoral
 INVALID_LABELS  = [-1, 15]       # pixels treated as invalid (shown white)
-SELECTED_SAMPLE_BIN = sample_IDs[10]   # a Sample_ID to plot just one, or [-1] to loop over all
 
 # 0 = invalid (white), 1 = other valid (gray), 2 = chosen (yellow), 3 = tumoral
 cmap_bin = ListedColormap(['white', 'lightgray', 'yellow', 'darkred'])
@@ -194,8 +174,8 @@ def categorize_binary(label):
     return 1        # other valid tissue -> gray
 
 
-def plot_binary_map(sample_id):
-    sub = df[df['Sample_ID'] == sample_id].copy()
+def plot_binary_map(sample_id, map_id, sub):
+    sub = sub.copy()
     sub['cat'] = sub['Label'].apply(categorize_binary)
     grid = sub.pivot_table(index='y', columns='x', values='cat', aggfunc='first')
 
@@ -207,11 +187,8 @@ def plot_binary_map(sample_id):
     plt.tight_layout(); plt.show()
 
 
-if SELECTED_SAMPLE_BIN is not None:
-    plot_binary_map(SELECTED_SAMPLE_BIN)
-else:
-    for sid in df['Sample_ID'].unique():
-        plot_binary_map(sid)
+for (sample_id, map_id), sub in df.groupby(['Sample_ID', 'Map_ID']):
+    plot_binary_map(sample_id, map_id, sub)
 
 # %% --- samples containing a chosen class ---
 

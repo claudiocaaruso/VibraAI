@@ -37,7 +37,7 @@ plt.rcParams.update(
     }
 )
 
-CLASS_NAMES = ['Healthy', 'Tumoral']
+CLASS_NAMES = ['Tumor stroma', 'Tumor']
 Y_PROB_BIAS = 0.49
 
 def _finish(fig, save_path, show, wspace=None):
@@ -134,11 +134,15 @@ def plot_roc(roc_data, title='', save_path=None, show=False):
 
 
 def plot_confusion(roc_data, title='', save_path=None, show=False):
-    """Row-normalised confusion matrix, aggregated (summed) across folds."""
-    total = np.zeros((2, 2), dtype=float)
-    for y_true, y_prob in roc_data:
-        total += confusion_matrix(y_true, (y_prob > Y_PROB_BIAS).astype(int), labels=[0, 1])
-    cm = total / total.sum(axis=1, keepdims=True)
+    """Confusion matrix, row-normalised per fold then averaged across folds.
+
+    Matches the macro-averaged recall/tnr reported in the training summary
+    (mean of per-fold metrics), rather than pooling raw counts across folds.
+    """
+    cms = [confusion_matrix(y_true, (y_prob > Y_PROB_BIAS).astype(int), labels=[0, 1],
+                            normalize='true')
+           for y_true, y_prob in roc_data]
+    cm = np.mean(cms, axis=0)
 
     fig, ax = plt.subplots(figsize=_ROC_CM_FIGSIZE)
     sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', ax=ax, cbar=False, square=True,
@@ -164,7 +168,7 @@ def plot_fold_auc(aucs, title='', save_path=None, show=False):
     _finish(fig, save_path, show)
 
 
-def plot_sample_f1(sample_ids, f1_scores, title='', save_path=None, show=False):
+def plot_sample_f1(sample_ids, f1_scores, save_path=None, show=False):
     """Horizontal bar chart of F1 per Sample_ID, sorted ascending, mean as a dashed line.
 
     Each sample is held out exactly once under 5-fold group-aware CV, so this
@@ -183,9 +187,10 @@ def plot_sample_f1(sample_ids, f1_scores, title='', save_path=None, show=False):
     ax.barh(y_pos, f1_scores, color='#4c72b0')
     mean = np.nanmean(f1_scores)
     ax.axvline(mean, color='r', ls='--', label=f'Mean = {mean:.3f}')
-    ax.set_yticks(y_pos); ax.set_yticklabels(sample_ids)
-    ax.set_xlabel('F1'); ax.set_xlim(0, 1)
-    ax.set_title(title or 'F1 per sample'); ax.legend()
+    ax.set_yticks(y_pos); ax.set_yticklabels(sample_ids, fontsize=14)
+    ax.set_xlabel('F1', fontsize=16); ax.set_xlim(0, 1)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.legend(loc='lower right', fontsize=16)
     _finish(fig, save_path, show)
 
 
@@ -266,7 +271,7 @@ def plot_grid_complexity(summary_df, metric='auc', title='', save_path=None, sho
 HEALTHY_TUMOR_CMAP = LinearSegmentedColormap.from_list('healthy_tumor', ['forestgreen', 'darkred'])
 
 
-def plot_prediction_map(x, y, y_true, y_prob, threshold, title='', save_path=None, show=False):
+def plot_prediction_map(x, y, y_true, y_prob, threshold, save_path=None, show=False):
     """True labels, predicted probability, and prediction errors for one Raman map.
 
     Three panels sharing spatial (x, y) axes: true tumoral/healthy labels,
@@ -285,22 +290,23 @@ def plot_prediction_map(x, y, y_true, y_prob, threshold, title='', save_path=Non
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    axes[0].imshow(grid(y_true), cmap=HEALTHY_TUMOR_CMAP, vmin=0, vmax=1, origin='lower')
-    axes[0].set_title('True labels')
+    im0 = axes[0].imshow(grid(y_true), cmap=HEALTHY_TUMOR_CMAP, vmin=0, vmax=1, origin='lower')
+    axes[0].set_title('True labels', fontsize=18)
+    cbar0 = fig.colorbar(im0, ax=axes[0], ticks=[0, 1], fraction=0.046)
+    cbar0.ax.set_yticklabels(['Healthy', 'Tumor'], fontsize=18)
 
     im = axes[1].imshow(grid(y_prob), cmap=HEALTHY_TUMOR_CMAP, vmin=0, vmax=1, origin='lower')
-    axes[1].set_title('Predicted probability')
-    fig.colorbar(im, ax=axes[1], fraction=0.046)
+    axes[1].set_title('Predicted probability', fontsize=18)
+    cbar1 = fig.colorbar(im, ax=axes[1], fraction=0.046)
+    cbar1.ax.tick_params(labelsize=18)
 
     im2 = axes[2].imshow(grid(is_error), cmap=ListedColormap(['white', 'red']),
                          vmin=0, vmax=1, origin='lower')
-    cbar = fig.colorbar(im2, ax=axes[2], ticks=[0, 1], fraction=0.046)
-    cbar.ax.set_yticklabels(['Correct', 'Error'])
-    axes[2].set_title('Prediction errors')
+    cbar2 = fig.colorbar(im2, ax=axes[2], ticks=[0, 1], fraction=0.046)
+    cbar2.ax.set_yticklabels(['Correct', 'Error'], fontsize=18)
+    axes[2].set_title('Prediction errors', fontsize=18)
 
     for ax in axes:
-        ax.set_xlabel('x'); ax.set_ylabel('y')
+        ax.tick_params(axis='both', labelsize=16)
 
-    if title:
-        fig.suptitle(title)
     _finish(fig, save_path, show)

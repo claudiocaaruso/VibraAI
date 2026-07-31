@@ -42,11 +42,11 @@ SEED = 43                       # controls every stochastic step (splits, balanc
 
 # --- dataset & labels (fully configurable) ---
 TUMOR_LABELS   = [2,20]     # mapped to the positive class (1 = Tumoral)
-PROBLEM_TYPE = 'Single-class'       # Single-class or Macro-class (FIRST LETTER IN UPPERCASE)
+PROBLEM_TYPE = 'Macro-class'       # Single-class or Macro-class (FIRST LETTER IN UPPERCASE)
 
 # --- single-mode configuration ---
 ARCHITECTURE = 'S'              # 'S' | 'M' | 'L'
-N_PC         = 10
+N_PC         = 20
 # --- grid-mode variants ---
 ARCHITECTURE_VARIANTS = ['S', 'M', 'L']
 PC_VARIANTS           = [1, 2, 3, 5, 10, 20, 30, 50, 100, 150, 200, 300, 400, 483]
@@ -68,7 +68,7 @@ set_seed(SEED)
 if PROBLEM_TYPE == 'Single-class':
     EXCLUDE_LABELS = [-1, 15, 0, 19, 23, 8, 3, 10, 5, 9, 4]       # dropped from the dataset before training
 else:
-    EXCLUDE_LABELS = [-1, 15]
+    EXCLUDE_LABELS = [-1, 15, 0]
 
 # ══════════════════════════════ LOAD DATA ═════════════════════════════════════
 
@@ -181,7 +181,7 @@ for (architecture, n_pc), store in acc.items():
     if n_folds > 1:
         plots.plot_fold_auc(aucs, title=f'AUC per fold – {config_desc}',
                             save_path=_p('fold_auc.png'), show=SHOW_PLOTS)
-    plots.plot_sample_f1(sample_df['sample_id'], sample_df['f1'], title=f'F1 per sample – {config_desc}',
+    plots.plot_sample_f1(sample_df['sample_id'], sample_df['f1'],
                          save_path=_p('sample_f1.png'), show=SHOW_PLOTS)
 
 # ══════════════════════════════ SUMMARIES ═════════════════════════════════════
